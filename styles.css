@@ -66,23 +66,19 @@
 
 :root.tvtc-vertical-theater .tvtc-player,
 :root.tvtc-vertical-theater .tvtc-player > div,
-:root.tvtc-vertical-theater .tvtc-player .video-player,
-:root.tvtc-vertical-theater .tvtc-player .video-player__container,
-:root.tvtc-vertical-theater .tvtc-player .video-ref {
+:root.tvtc-vertical-theater .tvtc-player-inner {
   box-sizing: border-box !important;
 }
 
-:root.tvtc-vertical-theater .tvtc-player .video-player,
-:root.tvtc-vertical-theater .tvtc-player .video-player__container,
-:root.tvtc-vertical-theater .tvtc-player .video-ref,
-:root.tvtc-vertical-theater .tvtc-player video {
+:root.tvtc-vertical-theater .tvtc-player-inner {
   width: 100% !important;
   height: 100% !important;
   max-width: 100% !important;
   max-height: 100% !important;
+  overflow: visible !important;
 }
 
-:root.tvtc-vertical-theater .tvtc-player video {
+:root.tvtc-vertical-theater .tvtc-player-inner video {
   object-fit: contain !important;
 }
 

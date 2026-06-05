@@ -21,6 +21,8 @@ In vertical Theater Mode, the Twitch top bar is hidden and chat gets the space t
 
 The extension also detects Twitch-native collapsed chat when resizing from horizontal to vertical, and it pauses layout recalculation while hovering the player so Twitch's quality/settings controls stay usable.
 
+Player positioning is applied to the outer Twitch player wrapper, not the internal player/control node, so Twitch's native hover controls and quality menu can keep their own behavior.
+
 ## Tuning
 
 To change the chat height, edit `styles.css`:

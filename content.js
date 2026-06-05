@@ -2,6 +2,7 @@
   const ROOT_CLASS = "tvtc-vertical-theater";
   const DEBUG_CLASS = "tvtc-debug";
   const PLAYER_CLASS = "tvtc-player";
+  const PLAYER_INNER_CLASS = "tvtc-player-inner";
   const CHAT_CLASS = "tvtc-chat";
   const BACKDROP_CLASS = "tvtc-backdrop";
   const CONTROLS_CLASS = "tvtc-controls";
@@ -12,6 +13,7 @@
   let scheduled = false;
   let playerHovering = false;
   let trackedPlayer = null;
+  let suppressPlayerMutationUntil = 0;
 
   function clamp(min, value, max) {
     return Math.min(Math.max(value, min), max);
@@ -99,19 +101,27 @@
   }
 
   function markLayoutNodes() {
-    const player = getVideoPlayer();
+    const videoPlayer = getVideoPlayer();
+    const player = findPlayerWrapper(videoPlayer) || videoPlayer;
     const chat = findChatNode();
-    trackPlayerHover(player);
+    trackPlayerHover(videoPlayer || player);
 
-    document.querySelectorAll("." + PLAYER_CLASS).forEach((node) => {
+    document.querySelectorAll("." + PLAYER_CLASS + ", ." + PLAYER_INNER_CLASS).forEach((node) => {
       if (node !== player) node.classList.remove(PLAYER_CLASS);
+      if (node !== videoPlayer) node.classList.remove(PLAYER_INNER_CLASS);
     });
     document.querySelectorAll("." + CHAT_CLASS).forEach((node) => {
       if (node !== chat) node.classList.remove(CHAT_CLASS);
     });
 
     if (player && !player.classList.contains(PLAYER_CLASS)) player.classList.add(PLAYER_CLASS);
+    if (videoPlayer && !videoPlayer.classList.contains(PLAYER_INNER_CLASS)) videoPlayer.classList.add(PLAYER_INNER_CLASS);
     if (chat && !chat.classList.contains(CHAT_CLASS)) chat.classList.add(CHAT_CLASS);
+  }
+
+  function findPlayerWrapper(videoPlayer) {
+    if (!videoPlayer) return null;
+    return videoPlayer.closest(".persistent-player") || videoPlayer.closest(".channel-root__player") || videoPlayer.parentElement;
   }
 
   function trackPlayerHover(player) {
@@ -133,11 +143,12 @@
 
   function handlePlayerEnter() {
     playerHovering = true;
+    suppressPlayerMutationUntil = Date.now() + 1500;
   }
 
   function handlePlayerLeave() {
     playerHovering = false;
-    scheduleUpdate(true);
+    suppressPlayerMutationUntil = Date.now() + 1500;
   }
 
   function updateLayoutVars() {
@@ -286,7 +297,7 @@
   }
 
   function scheduleUpdate(force) {
-    if (playerHovering && !force) return;
+    if (!force && (playerHovering || Date.now() < suppressPlayerMutationUntil)) return;
     if (scheduled) return;
     scheduled = true;
     window.requestAnimationFrame(update);
