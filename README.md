@@ -31,7 +31,7 @@ In vertical theater mode, Twitch video overlay extension iframes/docks are hidde
 
 Run `tvtcDiagnose()` in the Twitch DevTools console to inspect which elements are hit-tested at the player corners.
 
-Version 1.1.4 keeps the player hover fix while restoring chat above the theater backdrop.
+Version 1.1.5 fixes false chat-hidden detection caused by Twitch/FFZ show-chat buttons.
 
 ## Tuning
 

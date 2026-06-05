@@ -8,10 +8,12 @@
   const POSITION_BUTTON_CLASS = "tvtc-position-action";
   const VISIBILITY_BUTTON_CLASS = "tvtc-visibility-action";
   const POSITION_KEY = "tvtc-chat-position";
-  const HIDDEN_KEY = "tvtc-chat-hidden";
+  const HIDDEN_KEY = "tvtc-chat-hidden-v2";
   let scheduled = false;
   let theaterSessionActive = false;
   let theaterIntentUntil = 0;
+
+  localStorage.removeItem("tvtc-chat-hidden");
 
   function clamp(min, value, max) {
     return Math.min(Math.max(value, min), max);
@@ -31,8 +33,7 @@
   }
 
   function isEffectiveChatHidden() {
-    const chat = findChatNode();
-    return isChatHidden() || isNativeChatCollapsed() || !chat || !hasChatContent();
+    return isChatHidden() || isNativeChatCollapsed();
   }
 
   function setChatHidden(hidden) {
@@ -78,7 +79,7 @@
   function isNativeChatCollapsed() {
     const chat = findChatNode();
     const chatClass = (chat && chat.className) || "";
-    return Boolean(findNativeChatButton("expand") || /\bcollapsed\b/i.test(chatClass));
+    return Boolean(!chat || (/\bcollapsed\b/i.test(chatClass) && !hasChatContent()));
   }
 
   function isTheaterMode() {
