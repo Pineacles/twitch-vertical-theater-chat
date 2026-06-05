@@ -31,6 +31,8 @@ In vertical theater mode, Twitch video overlay extension iframes/docks are hidde
 
 Run `tvtcDiagnose()` in the Twitch DevTools console to inspect which elements are hit-tested at the player corners.
 
+Version 1.1.4 keeps the player hover fix while restoring chat above the theater backdrop.
+
 ## Tuning
 
 To change the chat height, edit `styles.css`:
