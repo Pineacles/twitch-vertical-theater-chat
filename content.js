@@ -92,8 +92,9 @@
 
   function isNativeChatCollapsed() {
     const chat = findChatNode();
-    const chatClass = (chat && chat.className) || "";
-    return Boolean(!chat || (/\bcollapsed\b/i.test(chatClass) && !hasChatContent()));
+    if (!chat) return true;
+    const chatClass = chat.className || "";
+    return /\bcollapsed\b/i.test(chatClass);
   }
 
   function isTheaterMode() {
@@ -303,10 +304,6 @@
     const wasActive = document.documentElement.classList.contains(ROOT_CLASS);
     if (wasActive !== active) {
       dlog("ROOT_CLASS toggle", { from: wasActive, to: active, theater: theaterActive, session: theaterSessionActive, vertical: isVerticalLayout(), suppressed: Date.now() < suppressTheaterUntil });
-      if (isNativeChatCollapsed() && (!active || !isChatHidden())) {
-        dlog("expanding chat on layout transition");
-        clickNativeChatExpand();
-      }
     }
     document.documentElement.classList.toggle(ROOT_CLASS, active);
 
