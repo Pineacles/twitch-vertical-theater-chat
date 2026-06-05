@@ -29,6 +29,8 @@ The extension does not attach listeners or layout classes to Twitch's internal v
 
 In vertical theater mode, Twitch video overlay extension iframes/docks are hidden because they can cover the player controls and break hover behavior near the bottom-right control group.
 
+When another browser extension injects hover UI over the top-right or bottom-right player corners, the extension disables pointer events on that injected overlay while vertical theater is active, then restores it when the layout exits.
+
 ## Tuning
 
 To change the chat height, edit `styles.css`:

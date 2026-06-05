@@ -12,6 +12,8 @@
   let scheduled = false;
   let theaterSessionActive = false;
   let theaterIntentUntil = 0;
+  let lastOverlayProbe = 0;
+  const disabledOverlayNodes = new Map();
 
   function clamp(min, value, max) {
     return Math.min(Math.max(value, min), max);
@@ -247,6 +249,9 @@
 
     if (active) {
       updateLayoutVars();
+      suppressForeignPlayerOverlays();
+    } else {
+      restoreForeignOverlays();
     }
 
     ensureBackdrop(active);
@@ -296,6 +301,14 @@
     }
   }
 
+  function handleDocumentPointerMove() {
+    if (!document.documentElement.classList.contains(ROOT_CLASS)) return;
+    const now = Date.now();
+    if (now - lastOverlayProbe < 120) return;
+    lastOverlayProbe = now;
+    suppressForeignPlayerOverlays();
+  }
+
   function isIgnoredMutation(mutation) {
     const target = mutation.target instanceof Element ? mutation.target : mutation.target.parentElement;
     if (!target) return false;
@@ -308,6 +321,99 @@
     );
   }
 
+  function isTwitchOwnedElement(element) {
+    const classText = typeof element.className === "string" ? element.className : "";
+    const idText = element.id || "";
+    const srcText = element.getAttribute("src") || "";
+    const markerText = (classText + " " + idText + " " + srcText).toLowerCase();
+
+    if (/pip|picture|extension|ffz|franker|darkreader|surfshark/.test(markerText)) return false;
+
+    return Boolean(
+      element.closest('[data-a-target="player-controls"]') ||
+        element.closest('[data-a-target="player-overlay-click-handler"]') ||
+        element.closest('[data-a-target="ax-overlay"]') ||
+        element.closest("#channel-player") ||
+        element.closest(".player-controls") ||
+        element.closest(".video-player__overlay") ||
+        element.closest("." + CHAT_CLASS) ||
+        element.closest("." + CONTROLS_CLASS)
+    );
+  }
+
+  function looksLikeForeignOverlay(element, player) {
+    if (!element || element === document.documentElement || element === document.body) return false;
+    if (isTwitchOwnedElement(element)) return false;
+
+    const rect = element.getBoundingClientRect();
+    const playerRect = player.getBoundingClientRect();
+    const style = getComputedStyle(element);
+
+    if (style.pointerEvents === "none" || style.visibility === "hidden" || style.display === "none") return false;
+    if (rect.width < 8 || rect.height < 8) return false;
+
+    const overlapsPlayer =
+      rect.right > playerRect.left &&
+      rect.left < playerRect.right &&
+      rect.bottom > playerRect.top &&
+      rect.top < playerRect.bottom;
+
+    if (!overlapsPlayer) return false;
+
+    const classText = typeof element.className === "string" ? element.className : "";
+    const idText = element.id || "";
+    const srcText = element.getAttribute("src") || "";
+    const text = (classText + " " + idText + " " + srcText).toLowerCase();
+
+    return (
+      /pip|picture|extension|ffz|franker|darkreader|surfshark|overlay|button|tooltip/.test(text) ||
+      style.position === "fixed" ||
+      style.position === "absolute"
+    );
+  }
+
+  function disableForeignOverlay(element) {
+    if (disabledOverlayNodes.has(element)) return;
+    disabledOverlayNodes.set(element, {
+      value: element.style.getPropertyValue("pointer-events"),
+      priority: element.style.getPropertyPriority("pointer-events")
+    });
+    element.dataset.tvtcDisabledOverlay = "true";
+    element.style.setProperty("pointer-events", "none", "important");
+  }
+
+  function restoreForeignOverlays() {
+    for (const [element, pointerEvents] of disabledOverlayNodes) {
+      element.style.setProperty("pointer-events", pointerEvents.value, pointerEvents.priority);
+      delete element.dataset.tvtcDisabledOverlay;
+    }
+    disabledOverlayNodes.clear();
+  }
+
+  function suppressForeignPlayerOverlays() {
+    const player = document.querySelector("." + PLAYER_CLASS);
+    if (!player || isEffectiveChatHidden()) return;
+
+    const rect = player.getBoundingClientRect();
+    const points = [
+      [rect.right - 8, rect.top + 8],
+      [rect.right - 8, rect.bottom - 8],
+      [rect.right - 70, rect.bottom - 35],
+      [rect.right - 20, rect.bottom - 35],
+      [rect.right - 20, rect.top + 35]
+    ];
+
+    for (const point of points) {
+      const x = Math.max(0, Math.min(window.innerWidth - 1, point[0]));
+      const y = Math.max(0, Math.min(window.innerHeight - 1, point[1]));
+      const stack = document.elementsFromPoint(x, y);
+      for (const element of stack) {
+        if (looksLikeForeignOverlay(element, player)) disableForeignOverlay(element);
+        if (element === player || element.getAttribute("data-a-target") === "video-player") break;
+      }
+    }
+  }
+
   const observer = new MutationObserver((mutations) => {
     if (mutations.length && mutations.every(isIgnoredMutation)) return;
     scheduleUpdate(false);
@@ -318,6 +424,7 @@
   });
 
   document.addEventListener("pointerdown", handleDocumentPointerDown, true);
+  document.addEventListener("pointermove", handleDocumentPointerMove, true);
   window.addEventListener("resize", () => scheduleUpdate(true), { passive: true });
   window.addEventListener("orientationchange", () => scheduleUpdate(true), { passive: true });
   window.addEventListener("popstate", () => scheduleUpdate(true));
