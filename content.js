@@ -3,10 +3,21 @@
   const DEBUG_CLASS = "tvtc-debug";
   const PLAYER_CLASS = "tvtc-player";
   const CHAT_CLASS = "tvtc-chat";
+  const TOGGLE_CLASS = "tvtc-position-toggle";
+  const POSITION_KEY = "tvtc-chat-position";
   let scheduled = false;
 
   function clamp(min, value, max) {
     return Math.min(Math.max(value, min), max);
+  }
+
+  function getChatPosition() {
+    return localStorage.getItem(POSITION_KEY) === "top" ? "top" : "bottom";
+  }
+
+  function setChatPosition(position) {
+    localStorage.setItem(POSITION_KEY, position);
+    scheduleUpdate();
   }
 
   function isWatchPage() {
@@ -58,46 +69,49 @@
     if (chat && !chat.classList.contains(CHAT_CLASS)) chat.classList.add(CHAT_CLASS);
   }
 
-  function getTopOffset() {
-    const nav = document.querySelector('[data-a-target="top-nav-container"], .top-nav');
-    const rect = nav && nav.getBoundingClientRect();
-    if (!rect || rect.height < 20 || rect.bottom < 20) return 0;
-    return Math.round(rect.bottom);
-  }
-
-  function getLeftOffset(topOffset) {
-    const candidates = Array.from(document.body.children)
-      .map((node) => node.getBoundingClientRect())
-      .filter((rect) => {
-        return (
-          rect.left <= 1 &&
-          rect.right > 35 &&
-          rect.right < 120 &&
-          rect.top <= topOffset + 4 &&
-          rect.bottom > window.innerHeight * 0.5
-        );
-      });
-
-    if (!candidates.length) return 0;
-    return Math.round(Math.max(...candidates.map((rect) => rect.right)));
-  }
-
   function updateLayoutVars() {
-    const topOffset = getTopOffset();
-    const leftOffset = getLeftOffset(topOffset);
-    const availableHeight = Math.max(360, window.innerHeight - topOffset);
-    const ratio = window.innerHeight > 1400 ? 0.34 : 0.32;
-    const maxChatHeight = Math.min(760, availableHeight * 0.45);
-    let chatHeight = clamp(300, availableHeight * ratio, maxChatHeight);
-
-    if (availableHeight - chatHeight < 300) {
-      chatHeight = Math.max(220, availableHeight - 300);
-    }
+    const availableHeight = Math.max(360, window.innerHeight);
+    const availableWidth = Math.max(320, window.innerWidth);
+    const minChatHeight = clamp(240, availableHeight * 0.24, 420);
+    const maxPlayerHeight = Math.max(240, availableHeight - minChatHeight);
+    const naturalPlayerHeight = availableWidth * 9 / 16;
+    const playerHeight = Math.round(clamp(240, naturalPlayerHeight, maxPlayerHeight));
+    const chatHeight = Math.round(Math.max(220, availableHeight - playerHeight));
+    const chatPosition = getChatPosition();
+    const playerTop = chatPosition === "top" ? chatHeight : 0;
 
     const style = document.documentElement.style;
-    style.setProperty("--tvtc-top-offset", topOffset + "px");
-    style.setProperty("--tvtc-left-offset", leftOffset + "px");
-    style.setProperty("--tvtc-chat-height", Math.round(chatHeight) + "px");
+    style.setProperty("--tvtc-player-top", playerTop + "px");
+    style.setProperty("--tvtc-player-height", playerHeight + "px");
+    style.setProperty("--tvtc-chat-height", chatHeight + "px");
+    document.documentElement.dataset.tvtcChatPosition = chatPosition;
+  }
+
+  function ensurePositionToggle() {
+    const chat = document.querySelector("." + CHAT_CLASS);
+    if (!chat) return;
+
+    let button = chat.querySelector("." + TOGGLE_CLASS);
+    if (!button) {
+      button = document.createElement("button");
+      button.type = "button";
+      button.className = TOGGLE_CLASS;
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setChatPosition(getChatPosition() === "top" ? "bottom" : "top");
+      });
+      chat.appendChild(button);
+    }
+
+    const nextPosition = getChatPosition() === "top" ? "bottom" : "top";
+    button.textContent = nextPosition === "top" ? "Top" : "Bottom";
+    button.title = "Move chat to " + nextPosition;
+    button.setAttribute("aria-label", "Move chat to " + nextPosition);
+  }
+
+  function removePositionToggles() {
+    document.querySelectorAll("." + TOGGLE_CLASS).forEach((button) => button.remove());
   }
 
   function update() {
@@ -106,6 +120,12 @@
     updateLayoutVars();
     const active = isWatchPage() && isVerticalLayout() && hasVisibleChat() && isTheaterMode();
     document.documentElement.classList.toggle(ROOT_CLASS, active);
+
+    if (active) {
+      ensurePositionToggle();
+    } else {
+      removePositionToggles();
+    }
 
     if (document.documentElement.classList.contains(DEBUG_CLASS)) {
       document.documentElement.dataset.tvtcState = JSON.stringify({

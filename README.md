@@ -17,6 +17,8 @@ Unpacked Brave/Chrome extension that moves Twitch chat below the video when:
 
 5. Open a Twitch stream, click Theater Mode, and make the Brave window vertical or narrow.
 
+In vertical Theater Mode, the Twitch top bar is hidden and chat gets the space that is not needed by the 16:9 video. Use the small button on the chat header to move chat between the top and bottom.
+
 ## Tuning
 
 To change the chat height, edit `styles.css`:
