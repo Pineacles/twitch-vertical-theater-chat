@@ -92,8 +92,15 @@
 
   function isNativeChatCollapsed() {
     const chat = findChatNode();
-    const chatClass = (chat && chat.className) || "";
-    return Boolean(!chat || (/\bcollapsed\b/i.test(chatClass) && !hasChatContent()));
+    if (!chat) return true;
+    const chatClass = chat.className || "";
+    if (/\bcollapsed\b/i.test(chatClass) && !hasChatContent()) return true;
+    try {
+      const cs = getComputedStyle(chat);
+      if (cs.display === "none" || cs.visibility === "hidden") return true;
+      if (chat.offsetWidth === 0 && chat.offsetHeight === 0) return true;
+    } catch (e) {}
+    return false;
   }
 
   function isTheaterMode() {
@@ -165,6 +172,16 @@
     document.documentElement.dataset.tvtcChatHidden = hidden ? "true" : "false";
   }
 
+  let lastChatExpandAttempt = 0;
+  function maybeExpandChat(active) {
+    if (!isNativeChatCollapsed()) return;
+    if (active && isChatHidden()) return;
+    if (Date.now() - lastChatExpandAttempt < 1500) return;
+    lastChatExpandAttempt = Date.now();
+    dlog("maybeExpandChat: collapsed detected, attempting expand", { active: active });
+    clickNativeChatExpand();
+  }
+
   function clickNativeChatExpand() {
     const selectors = [
       '[data-a-target="right-column__toggle-expand-btn"]',
@@ -175,6 +192,7 @@
       'button[aria-label="Show chat"]'
     ];
     const button = findNativeChatButton("expand") || selectors.map((selector) => document.querySelector(selector)).find(Boolean);
+    dlog("clickNativeChatExpand", { buttonFound: Boolean(button), button: describeEl(button) });
     if (button) button.click();
   }
 
@@ -292,15 +310,23 @@
     const active = isActiveLayout();
     const wasActive = document.documentElement.classList.contains(ROOT_CLASS);
     if (wasActive !== active) {
-      dlog("ROOT_CLASS toggle", { from: wasActive, to: active, theater: theaterActive, session: theaterSessionActive, vertical: isVerticalLayout(), suppressed: Date.now() < suppressTheaterUntil });
-      if (isNativeChatCollapsed() && (!active || !isChatHidden())) {
-        dlog("auto-expanding native chat on layout transition");
-        clickNativeChatExpand();
-        window.setTimeout(() => scheduleUpdate(true), 100);
-        window.setTimeout(() => scheduleUpdate(true), 300);
-      }
+      const chatNode = findChatNode();
+      dlog("ROOT_CLASS toggle", {
+        from: wasActive,
+        to: active,
+        theater: theaterActive,
+        session: theaterSessionActive,
+        vertical: isVerticalLayout(),
+        suppressed: Date.now() < suppressTheaterUntil,
+        chatFound: Boolean(chatNode),
+        chatClass: chatNode ? chatNode.className : null,
+        chatDisplay: chatNode ? getComputedStyle(chatNode).display : null,
+        chatCollapsed: isNativeChatCollapsed(),
+        chatUserHidden: isChatHidden()
+      });
     }
     document.documentElement.classList.toggle(ROOT_CLASS, active);
+    maybeExpandChat(active);
 
     if (active) {
       updateLayoutVars();
@@ -495,7 +521,7 @@
   window.addEventListener("popstate", () => scheduleUpdate(true));
   window.setInterval(() => {
     if (isFullscreen()) return;
-    if (!document.documentElement.classList.contains(ROOT_CLASS)) scheduleUpdate(false);
+    scheduleUpdate(false);
   }, 1000);
 
   const pushState = history.pushState;
