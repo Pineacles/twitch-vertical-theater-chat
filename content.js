@@ -261,13 +261,6 @@
       }
     }, 300);
   }
-  function isInputFocused() {
-    const el = document.activeElement;
-    if (!el) return false;
-    const tag = el.tagName;
-    return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
-  }
-
   function deactivateLayout() {
     dlog("deactivateLayout called", { hadRoot: document.documentElement.classList.contains(ROOT_CLASS) });
     document.documentElement.classList.remove(ROOT_CLASS);
@@ -368,26 +361,12 @@
   }
 
   function handleDocumentKeyDown(event) {
-    if ((event.key === "f" || event.key === "F") && !event.ctrlKey && !event.metaKey && !event.altKey && !isInputFocused() && !isFullscreen()) {
-      markFullscreenPending();
-      return;
-    }
     if (event.key !== "Escape") return;
     theaterSessionActive = false;
     theaterIntentUntil = 0;
     suppressTheaterUntil = Date.now() + 1200;
     window.setTimeout(() => scheduleUpdate(true), 0);
     window.setTimeout(() => scheduleUpdate(true), 120);
-  }
-
-  function handleDocumentDblClick(event) {
-    const target = event.target instanceof Element ? event.target : null;
-    if (!target) return;
-    if (isFullscreen()) return;
-    if (target.closest("button")) return;
-    if (target.closest('[data-a-target="video-player"]')) {
-      markFullscreenPending();
-    }
   }
 
   function isIgnoredMutation(mutation) {
@@ -475,11 +454,9 @@
 
   document.addEventListener("pointerdown", handleDocumentPointerDown, true);
   document.addEventListener("keydown", handleDocumentKeyDown, true);
-  document.addEventListener("dblclick", handleDocumentDblClick, true);
   function handleFullscreenChange() {
     dlog("fullscreenchange", {
       fsEl: describeEl(document.fullscreenElement),
-      webkitFsEl: describeEl(document.webkitFullscreenElement),
       isFs: isFullscreen(),
       rootClass: document.documentElement.classList.contains(ROOT_CLASS),
       fsClass: document.documentElement.classList.contains(FS_CLASS)
@@ -490,15 +467,12 @@
     }
     if (isFullscreen()) {
       setFullscreenClass(true);
-      deactivateLayout();
       return;
     }
     setFullscreenClass(false);
-    theaterIntentUntil = Date.now() + 2500;
     suppressTheaterUntil = 0;
     scheduleUpdate(true);
     window.setTimeout(() => scheduleUpdate(true), 80);
-    window.setTimeout(() => scheduleUpdate(true), 300);
   }
   document.addEventListener("fullscreenchange", handleFullscreenChange);
   document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
