@@ -3,8 +3,11 @@
   const DEBUG_CLASS = "tvtc-debug";
   const PLAYER_CLASS = "tvtc-player";
   const CHAT_CLASS = "tvtc-chat";
-  const TOGGLE_CLASS = "tvtc-position-toggle";
+  const CONTROLS_CLASS = "tvtc-controls";
+  const POSITION_BUTTON_CLASS = "tvtc-position-action";
+  const VISIBILITY_BUTTON_CLASS = "tvtc-visibility-action";
   const POSITION_KEY = "tvtc-chat-position";
+  const HIDDEN_KEY = "tvtc-chat-hidden";
   let scheduled = false;
 
   function clamp(min, value, max) {
@@ -20,6 +23,16 @@
     scheduleUpdate();
   }
 
+  function isChatHidden() {
+    return localStorage.getItem(HIDDEN_KEY) === "true";
+  }
+
+  function setChatHidden(hidden) {
+    localStorage.setItem(HIDDEN_KEY, hidden ? "true" : "false");
+    if (!hidden) clickNativeChatExpand();
+    scheduleUpdate();
+  }
+
   function isWatchPage() {
     const path = window.location.pathname;
     return path.length > 1 && !path.startsWith("/directory") && !path.startsWith("/videos");
@@ -29,12 +42,14 @@
     return window.innerHeight >= window.innerWidth || window.innerWidth <= 820;
   }
 
-  function hasVisibleChat() {
-    return Boolean(
-      document.querySelector(".channel-root__right-column") ||
-        document.querySelector('[data-a-target="right-column-chat-bar"]') ||
-        document.querySelector('[data-test-selector="chat-room-component-layout"]')
-    );
+  function getVideoPlayer() {
+    return document.querySelector('[data-a-target="video-player"]');
+  }
+
+  function findChatNode() {
+    const chatBar = document.querySelector('[data-a-target="right-column-chat-bar"]');
+    const chatLayout = document.querySelector('[data-test-selector="chat-room-component-layout"]');
+    return document.querySelector(".channel-root__right-column") || (chatBar && chatBar.parentElement) || (chatLayout && chatLayout.parentElement);
   }
 
   function isTheaterMode() {
@@ -50,13 +65,13 @@
     );
   }
 
-  function markLayoutNodes() {
-    const videoPlayer = document.querySelector('[data-a-target="video-player"]');
-    const player = videoPlayer;
+  function isActiveLayout() {
+    return isWatchPage() && isVerticalLayout() && isTheaterMode() && Boolean(getVideoPlayer());
+  }
 
-    const chatBar = document.querySelector('[data-a-target="right-column-chat-bar"]');
-    const chatLayout = document.querySelector('[data-test-selector="chat-room-component-layout"]');
-    const chat = document.querySelector(".channel-root__right-column") || (chatBar && chatBar.parentElement) || (chatLayout && chatLayout.parentElement);
+  function markLayoutNodes() {
+    const player = getVideoPlayer();
+    const chat = findChatNode();
 
     document.querySelectorAll("." + PLAYER_CLASS).forEach((node) => {
       if (node !== player) node.classList.remove(PLAYER_CLASS);
@@ -72,67 +87,121 @@
   function updateLayoutVars() {
     const availableHeight = Math.max(360, window.innerHeight);
     const availableWidth = Math.max(320, window.innerWidth);
-    const minChatHeight = clamp(240, availableHeight * 0.24, 420);
-    const maxPlayerHeight = Math.max(240, availableHeight - minChatHeight);
-    const naturalPlayerHeight = availableWidth * 9 / 16;
-    const playerHeight = Math.round(clamp(240, naturalPlayerHeight, maxPlayerHeight));
-    const chatHeight = Math.round(Math.max(220, availableHeight - playerHeight));
-    const chatPosition = getChatPosition();
-    const playerTop = chatPosition === "top" ? chatHeight : 0;
+    const hidden = isChatHidden();
+    let playerHeight = availableHeight;
+    let chatHeight = 0;
 
+    if (!hidden) {
+      const minChatHeight = clamp(260, availableHeight * 0.28, 460);
+      const maxPlayerHeight = Math.max(240, availableHeight - minChatHeight);
+      const naturalPlayerHeight = availableWidth * 9 / 16;
+      playerHeight = Math.round(clamp(240, naturalPlayerHeight, maxPlayerHeight));
+      chatHeight = Math.round(Math.max(220, availableHeight - playerHeight));
+    }
+
+    const chatPosition = getChatPosition();
+    const playerTop = !hidden && chatPosition === "top" ? chatHeight : 0;
     const style = document.documentElement.style;
+
     style.setProperty("--tvtc-player-top", playerTop + "px");
-    style.setProperty("--tvtc-player-height", playerHeight + "px");
-    style.setProperty("--tvtc-chat-height", chatHeight + "px");
+    style.setProperty("--tvtc-player-height", Math.round(playerHeight) + "px");
+    style.setProperty("--tvtc-chat-height", Math.round(chatHeight) + "px");
     document.documentElement.dataset.tvtcChatPosition = chatPosition;
+    document.documentElement.dataset.tvtcChatHidden = hidden ? "true" : "false";
   }
 
-  function ensurePositionToggle() {
-    const chat = document.querySelector("." + CHAT_CLASS);
-    if (!chat) return;
+  function clickNativeChatExpand() {
+    const selectors = [
+      '[data-a-target="right-column__toggle-expand-btn"]',
+      '[data-a-target="right-column__toggle-visibility-btn"]',
+      'button[aria-label="Expand Chat"]',
+      'button[aria-label="Expand chat"]',
+      'button[aria-label="Show Chat"]',
+      'button[aria-label="Show chat"]'
+    ];
+    const button = selectors.map((selector) => document.querySelector(selector)).find(Boolean);
+    if (button) button.click();
+  }
 
-    let button = chat.querySelector("." + TOGGLE_CLASS);
+  function iconSvg(name) {
+    const icons = {
+      up: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5l-6 6h4v8h4v-8h4l-6-6z"/><path d="M5 4h14"/></svg>',
+      down: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19l6-6h-4V5h-4v8H6l6 6z"/><path d="M5 20h14"/></svg>',
+      hide: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v10H8l-3 3V5z"/><path d="M4 21L20 3"/></svg>',
+      show: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v10H8l-3 3V5z"/><path d="M8 9h8"/><path d="M8 12h5"/></svg>'
+    };
+    return icons[name];
+  }
+
+  function ensureButton(container, className) {
+    let button = container.querySelector("." + className);
     if (!button) {
       button = document.createElement("button");
       button.type = "button";
-      button.className = TOGGLE_CLASS;
-      button.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        setChatPosition(getChatPosition() === "top" ? "bottom" : "top");
-      });
-      chat.appendChild(button);
+      button.className = "tvtc-icon-button " + className;
+      container.appendChild(button);
     }
-
-    const nextPosition = getChatPosition() === "top" ? "bottom" : "top";
-    button.textContent = nextPosition === "top" ? "Top" : "Bottom";
-    button.title = "Move chat to " + nextPosition;
-    button.setAttribute("aria-label", "Move chat to " + nextPosition);
+    return button;
   }
 
-  function removePositionToggles() {
-    document.querySelectorAll("." + TOGGLE_CLASS).forEach((button) => button.remove());
+  function ensureControls(active) {
+    let controls = document.querySelector("." + CONTROLS_CLASS);
+
+    if (!active) {
+      if (controls) controls.remove();
+      return;
+    }
+
+    if (!controls) {
+      controls = document.createElement("div");
+      controls.className = CONTROLS_CLASS;
+      document.body.appendChild(controls);
+    }
+
+    const positionButton = ensureButton(controls, POSITION_BUTTON_CLASS);
+    const visibilityButton = ensureButton(controls, VISIBILITY_BUTTON_CLASS);
+    const nextPosition = getChatPosition() === "top" ? "bottom" : "top";
+    const hidden = isChatHidden();
+
+    positionButton.innerHTML = iconSvg(nextPosition === "top" ? "up" : "down");
+    positionButton.title = "Move chat to " + nextPosition;
+    positionButton.setAttribute("aria-label", "Move chat to " + nextPosition);
+    positionButton.onclick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setChatPosition(nextPosition);
+    };
+
+    visibilityButton.innerHTML = iconSvg(hidden ? "show" : "hide");
+    visibilityButton.title = hidden ? "Show chat" : "Hide chat";
+    visibilityButton.setAttribute("aria-label", hidden ? "Show chat" : "Hide chat");
+    visibilityButton.onclick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setChatHidden(!isChatHidden());
+    };
   }
 
   function update() {
     scheduled = false;
     markLayoutNodes();
-    updateLayoutVars();
-    const active = isWatchPage() && isVerticalLayout() && hasVisibleChat() && isTheaterMode();
+    const active = isActiveLayout();
     document.documentElement.classList.toggle(ROOT_CLASS, active);
 
     if (active) {
-      ensurePositionToggle();
-    } else {
-      removePositionToggles();
+      updateLayoutVars();
     }
+
+    ensureControls(active);
 
     if (document.documentElement.classList.contains(DEBUG_CLASS)) {
       document.documentElement.dataset.tvtcState = JSON.stringify({
         active,
         vertical: isVerticalLayout(),
         theater: isTheaterMode(),
-        chat: hasVisibleChat(),
+        chat: Boolean(findChatNode()),
+        hidden: isChatHidden(),
+        position: getChatPosition(),
         width: window.innerWidth,
         height: window.innerHeight
       });
