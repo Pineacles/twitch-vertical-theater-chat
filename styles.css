@@ -1,0 +1,61 @@
+:root.tvtc-vertical-theater {
+  --tvtc-chat-height: min(42vh, 420px);
+}
+
+:root.tvtc-vertical-theater .channel-root__main,
+:root.tvtc-vertical-theater .channel-root__content {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  overflow: hidden !important;
+}
+
+:root.tvtc-vertical-theater .channel-root__player,
+:root.tvtc-vertical-theater .persistent-player,
+:root.tvtc-vertical-theater .persistent-player--theatre,
+:root.tvtc-vertical-theater [data-a-target="video-player"] {
+  order: 1 !important;
+  width: 100% !important;
+  height: calc(100vh - var(--tvtc-chat-height)) !important;
+  min-height: 0 !important;
+  max-height: calc(100vh - var(--tvtc-chat-height)) !important;
+  flex: 1 1 auto !important;
+}
+
+:root.tvtc-vertical-theater .channel-root__right-column {
+  position: relative !important;
+  inset: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  order: 2 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: var(--tvtc-chat-height) !important;
+  min-height: 220px !important;
+  max-height: 45vh !important;
+  flex: 0 0 var(--tvtc-chat-height) !important;
+  border-left: 0 !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.14) !important;
+  transform: none !important;
+  z-index: 20 !important;
+}
+
+:root.tvtc-vertical-theater [data-a-target="right-column-chat-bar"],
+:root.tvtc-vertical-theater [data-test-selector="chat-room-component-layout"] {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+:root.tvtc-vertical-theater .chat-room,
+:root.tvtc-vertical-theater .chat-list--default,
+:root.tvtc-vertical-theater .chat-scrollable-area__message-container {
+  max-height: 100% !important;
+}
+
+:root.tvtc-vertical-theater .channel-root__right-column--collapsed {
+  display: none !important;
+}
