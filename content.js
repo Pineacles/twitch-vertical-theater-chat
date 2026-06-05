@@ -3,6 +3,7 @@
   const DEBUG_CLASS = "tvtc-debug";
   const PLAYER_CLASS = "tvtc-player";
   const CHAT_CLASS = "tvtc-chat";
+  const FS_CLASS = "tvtc-fs";
   const CONTROLS_CLASS = "tvtc-controls";
   const POSITION_BUTTON_CLASS = "tvtc-position-action";
   const VISIBILITY_BUTTON_CLASS = "tvtc-visibility-action";
@@ -241,6 +242,34 @@
     });
   }
 
+  let fullscreenPendingTimer = null;
+  function setFullscreenClass(on) {
+    const had = document.documentElement.classList.contains(FS_CLASS);
+    if (had === on) return;
+    document.documentElement.classList.toggle(FS_CLASS, on);
+    dlog("setFullscreenClass", { on: on });
+  }
+  function markFullscreenPending() {
+    dlog("markFullscreenPending");
+    setFullscreenClass(true);
+    deactivateLayout();
+    if (fullscreenPendingTimer) clearTimeout(fullscreenPendingTimer);
+    fullscreenPendingTimer = window.setTimeout(function () {
+      fullscreenPendingTimer = null;
+      if (!isFullscreen()) {
+        dlog("fullscreen pending timeout fired, request never landed");
+        setFullscreenClass(false);
+        scheduleUpdate(true);
+      }
+    }, 2000);
+  }
+  function isInputFocused() {
+    const el = document.activeElement;
+    if (!el) return false;
+    const tag = el.tagName;
+    return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
+  }
+
   function deactivateLayout() {
     dlog("deactivateLayout called", { hadRoot: document.documentElement.classList.contains(ROOT_CLASS) });
     document.documentElement.classList.remove(ROOT_CLASS);
@@ -308,7 +337,7 @@
 
     const fullscreenButton = target.closest('[data-a-target="player-fullscreen-button"]');
     if (fullscreenButton && !isFullscreen()) {
-      deactivateLayout();
+      markFullscreenPending();
       return;
     }
 
@@ -341,12 +370,25 @@
   }
 
   function handleDocumentKeyDown(event) {
+    if ((event.key === "f" || event.key === "F") && !event.ctrlKey && !event.metaKey && !event.altKey && !isInputFocused() && !isFullscreen()) {
+      markFullscreenPending();
+      return;
+    }
     if (event.key !== "Escape") return;
     theaterSessionActive = false;
     theaterIntentUntil = 0;
     suppressTheaterUntil = Date.now() + 1200;
     window.setTimeout(() => scheduleUpdate(true), 0);
     window.setTimeout(() => scheduleUpdate(true), 120);
+  }
+
+  function handleDocumentDblClick(event) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+    if (isFullscreen()) return;
+    if (target.closest('[data-a-target="video-player"]')) {
+      markFullscreenPending();
+    }
   }
 
   function isIgnoredMutation(mutation) {
@@ -406,34 +448,6 @@
     };
   }
 
-  function installFullscreenDebug() {
-    const script = document.createElement("script");
-    script.textContent = [
-      "window.tvtcDebug = function () {",
-      "  var fsEl = document.fullscreenElement;",
-      "  var cx = Math.round(window.innerWidth / 2);",
-      "  var cy = Math.round(window.innerHeight / 2);",
-      "  var stackEls = document.elementsFromPoint(cx, cy).slice(0, 8);",
-      "  var stack = stackEls.map(function (el) {",
-      "    var cs = getComputedStyle(el);",
-      "    return { tag: el.tagName, id: el.id, cls: (typeof el.className === 'string' ? el.className : ''), pe: cs.pointerEvents, pos: cs.position, z: cs.zIndex };",
-      "  });",
-      "  var report = {",
-      "    fullscreenElement: fsEl ? (fsEl.tagName + '.' + (typeof fsEl.className === 'string' ? fsEl.className : '')) : null,",
-      "    rootClasses: document.documentElement.className,",
-      "    bodyClasses: document.body.className,",
-      "    innerWidth: window.innerWidth, innerHeight: window.innerHeight,",
-      "    centerPoint: { x: cx, y: cy },",
-      "    stackAtCenter: stack",
-      "  };",
-      "  console.log('[TVTC tvtcDebug]', JSON.stringify(report, null, 2));",
-      "  return report;",
-      "};"
-    ].join("\n");
-    (document.head || document.documentElement).appendChild(script);
-    script.remove();
-  }
-
   function installDiagnosticBridge() {
     document.addEventListener("tvtc:diagnose", () => {
       document.documentElement.setAttribute("data-tvtc-diagnostic", JSON.stringify(buildDiagnostic()));
@@ -462,17 +476,25 @@
 
   document.addEventListener("pointerdown", handleDocumentPointerDown, true);
   document.addEventListener("keydown", handleDocumentKeyDown, true);
+  document.addEventListener("dblclick", handleDocumentDblClick, true);
   function handleFullscreenChange() {
     dlog("fullscreenchange", {
       fsEl: describeEl(document.fullscreenElement),
       webkitFsEl: describeEl(document.webkitFullscreenElement),
       isFs: isFullscreen(),
-      rootClass: document.documentElement.classList.contains(ROOT_CLASS)
+      rootClass: document.documentElement.classList.contains(ROOT_CLASS),
+      fsClass: document.documentElement.classList.contains(FS_CLASS)
     });
+    if (fullscreenPendingTimer) {
+      clearTimeout(fullscreenPendingTimer);
+      fullscreenPendingTimer = null;
+    }
     if (isFullscreen()) {
+      setFullscreenClass(true);
       deactivateLayout();
       return;
     }
+    setFullscreenClass(false);
     theaterIntentUntil = Date.now() + 2500;
     suppressTheaterUntil = 0;
     scheduleUpdate(true);
@@ -505,6 +527,5 @@
   };
 
   installDiagnosticBridge();
-  installFullscreenDebug();
   scheduleUpdate(true);
 })();
