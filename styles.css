@@ -45,6 +45,17 @@
   display: none !important;
 }
 
+:root.tvtc-vertical-theater .extension-overlay__iframe,
+:root.tvtc-vertical-theater .extension-view__iframe,
+:root.tvtc-vertical-theater [class*="extension-overlay"],
+:root.tvtc-vertical-theater [class*="extensions-dock"],
+:root.tvtc-vertical-theater [class*="extension-taskbar"],
+:root.tvtc-vertical-theater iframe[src*="supervisor.ext-twitch.tv"],
+:root.tvtc-vertical-theater iframe[src*="ext-twitch.tv"] {
+  display: none !important;
+  pointer-events: none !important;
+}
+
 :root.tvtc-vertical-theater .tvtc-player {
   position: fixed !important;
   top: var(--tvtc-player-top) !important;
@@ -118,7 +129,7 @@
 }
 
 :root.tvtc-vertical-theater[data-tvtc-chat-position="bottom"] .tvtc-controls {
-  top: 8px !important;
+  top: calc(100dvh - var(--tvtc-chat-height) + 8px) !important;
   bottom: auto !important;
 }
 

@@ -11,6 +11,7 @@
   const HIDDEN_KEY = "tvtc-chat-hidden";
   let scheduled = false;
   let theaterSessionActive = false;
+  let theaterIntentUntil = 0;
 
   function clamp(min, value, max) {
     return Math.min(Math.max(value, min), max);
@@ -94,7 +95,7 @@
   }
 
   function isActiveLayout() {
-    return isWatchPage() && isVerticalLayout() && (isTheaterMode() || theaterSessionActive) && Boolean(getVideoPlayer());
+    return isWatchPage() && isVerticalLayout() && (isTheaterMode() || theaterSessionActive || Date.now() < theaterIntentUntil) && Boolean(getVideoPlayer());
   }
 
   function markLayoutNodes() {
@@ -279,8 +280,10 @@
     if (theaterButton) {
       const label = theaterButton.getAttribute("aria-label") || "";
       theaterSessionActive = !/exit (theatre|theater) mode/i.test(label);
+      if (theaterSessionActive) theaterIntentUntil = Date.now() + 2500;
       scheduleUpdate(true);
       window.setTimeout(() => scheduleUpdate(true), 0);
+      window.setTimeout(() => scheduleUpdate(true), 16);
       window.setTimeout(() => scheduleUpdate(true), 80);
       window.setTimeout(() => scheduleUpdate(true), 300);
       return;
