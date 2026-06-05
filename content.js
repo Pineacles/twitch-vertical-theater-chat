@@ -229,19 +229,22 @@
   }
 
   function deactivateLayout() {
-    if (document.documentElement.classList.contains(ROOT_CLASS)) {
-      document.documentElement.classList.remove(ROOT_CLASS);
-    }
+    document.documentElement.classList.remove(ROOT_CLASS);
+    document.querySelectorAll("." + PLAYER_CLASS).forEach((node) => node.classList.remove(PLAYER_CLASS));
+    document.querySelectorAll("." + CHAT_CLASS).forEach((node) => node.classList.remove(CHAT_CLASS));
     const controls = document.querySelector("." + CONTROLS_CLASS);
     if (controls) controls.remove();
+    const style = document.documentElement.style;
+    style.removeProperty("--tvtc-player-top");
+    style.removeProperty("--tvtc-player-height");
+    style.removeProperty("--tvtc-chat-height");
+    delete document.documentElement.dataset.tvtcChatPosition;
+    delete document.documentElement.dataset.tvtcChatHidden;
   }
 
   function update() {
     scheduled = false;
-    if (isFullscreen()) {
-      deactivateLayout();
-      return;
-    }
+    if (isFullscreen()) return;
     markLayoutNodes();
     if (!isWatchPage() || !isVerticalLayout()) theaterSessionActive = false;
     const theaterActive = isTheaterMode();
@@ -280,6 +283,12 @@
   function handleDocumentPointerDown(event) {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
+
+    const fullscreenButton = target.closest('[data-a-target="player-fullscreen-button"]');
+    if (fullscreenButton && !isFullscreen()) {
+      deactivateLayout();
+      return;
+    }
 
     const theaterButton = target.closest('[data-a-target="player-theatre-mode-button"]');
     if (theaterButton) {
@@ -392,6 +401,7 @@
   }
 
   const observer = new MutationObserver((mutations) => {
+    if (isFullscreen()) return;
     if (mutations.length && mutations.every(isIgnoredMutation)) return;
     scheduleUpdate(false);
   });
@@ -405,8 +415,13 @@
   function handleFullscreenChange() {
     if (isFullscreen()) {
       deactivateLayout();
+      return;
     }
+    theaterIntentUntil = Date.now() + 2500;
+    suppressTheaterUntil = 0;
     scheduleUpdate(true);
+    window.setTimeout(() => scheduleUpdate(true), 80);
+    window.setTimeout(() => scheduleUpdate(true), 300);
   }
   document.addEventListener("fullscreenchange", handleFullscreenChange);
   document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
@@ -414,6 +429,7 @@
   window.addEventListener("orientationchange", () => scheduleUpdate(true), { passive: true });
   window.addEventListener("popstate", () => scheduleUpdate(true));
   window.setInterval(() => {
+    if (isFullscreen()) return;
     if (!document.documentElement.classList.contains(ROOT_CLASS)) scheduleUpdate(false);
   }, 1000);
 
