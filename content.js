@@ -228,8 +228,20 @@
     });
   }
 
+  function deactivateLayout() {
+    if (document.documentElement.classList.contains(ROOT_CLASS)) {
+      document.documentElement.classList.remove(ROOT_CLASS);
+    }
+    const controls = document.querySelector("." + CONTROLS_CLASS);
+    if (controls) controls.remove();
+  }
+
   function update() {
     scheduled = false;
+    if (isFullscreen()) {
+      deactivateLayout();
+      return;
+    }
     markLayoutNodes();
     if (!isWatchPage() || !isVerticalLayout()) theaterSessionActive = false;
     const theaterActive = isTheaterMode();
@@ -390,8 +402,14 @@
 
   document.addEventListener("pointerdown", handleDocumentPointerDown, true);
   document.addEventListener("keydown", handleDocumentKeyDown, true);
-  document.addEventListener("fullscreenchange", () => scheduleUpdate(true));
-  document.addEventListener("webkitfullscreenchange", () => scheduleUpdate(true));
+  function handleFullscreenChange() {
+    if (isFullscreen()) {
+      deactivateLayout();
+    }
+    scheduleUpdate(true);
+  }
+  document.addEventListener("fullscreenchange", handleFullscreenChange);
+  document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
   window.addEventListener("resize", () => scheduleUpdate(true), { passive: true });
   window.addEventListener("orientationchange", () => scheduleUpdate(true), { passive: true });
   window.addEventListener("popstate", () => scheduleUpdate(true));
