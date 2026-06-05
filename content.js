@@ -3,7 +3,6 @@
   const DEBUG_CLASS = "tvtc-debug";
   const PLAYER_CLASS = "tvtc-player";
   const CHAT_CLASS = "tvtc-chat";
-  const BACKDROP_CLASS = "tvtc-backdrop";
   const CONTROLS_CLASS = "tvtc-controls";
   const POSITION_BUTTON_CLASS = "tvtc-position-action";
   const VISIBILITY_BUTTON_CLASS = "tvtc-visibility-action";
@@ -191,21 +190,6 @@
     button.onclick = onClick;
   }
 
-  function ensureBackdrop(active) {
-    let backdrop = document.querySelector("." + BACKDROP_CLASS);
-
-    if (!active) {
-      if (backdrop) backdrop.remove();
-      return;
-    }
-
-    if (!backdrop) {
-      backdrop = document.createElement("div");
-      backdrop.className = BACKDROP_CLASS;
-      document.body.appendChild(backdrop);
-    }
-  }
-
   function ensureControls(active) {
     let controls = document.querySelector("." + CONTROLS_CLASS);
 
@@ -250,7 +234,6 @@
       updateLayoutVars();
     }
 
-    ensureBackdrop(active);
     ensureControls(active);
 
     if (document.documentElement.classList.contains(DEBUG_CLASS)) {

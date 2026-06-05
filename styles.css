@@ -8,6 +8,7 @@
 :root.tvtc-vertical-theater body {
   height: 100dvh !important;
   overflow: hidden !important;
+  background: #000 !important;
 }
 
 :root.tvtc-vertical-theater .channel-root__main,
@@ -18,11 +19,7 @@
 }
 
 :root.tvtc-vertical-theater .tvtc-backdrop {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 2147480000 !important;
-  display: block !important;
-  background: #000 !important;
+  display: none !important;
   pointer-events: none !important;
 }
 
