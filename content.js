@@ -186,12 +186,21 @@
     const selectors = [
       '[data-a-target="right-column__toggle-expand-btn"]',
       '[data-a-target="right-column__toggle-visibility-btn"]',
-      'button[aria-label="Expand Chat"]',
-      'button[aria-label="Expand chat"]',
-      'button[aria-label="Show Chat"]',
-      'button[aria-label="Show chat"]'
+      'button:not(.tvtc-icon-button)[aria-label="Expand Chat"]',
+      'button:not(.tvtc-icon-button)[aria-label="Expand chat"]',
+      'button:not(.tvtc-icon-button)[aria-label="Show Chat"]',
+      'button:not(.tvtc-icon-button)[aria-label="Show chat"]'
     ];
-    const button = findNativeChatButton("expand") || selectors.map((selector) => document.querySelector(selector)).find(Boolean);
+    let button = findNativeChatButton("expand");
+    if (!button) {
+      for (let i = 0; i < selectors.length; i++) {
+        const candidate = document.querySelector(selectors[i]);
+        if (candidate && !candidate.classList.contains("tvtc-icon-button")) {
+          button = candidate;
+          break;
+        }
+      }
+    }
     dlog("clickNativeChatExpand", { buttonFound: Boolean(button), button: describeEl(button) });
     if (button) button.click();
   }
