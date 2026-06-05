@@ -10,6 +10,8 @@
   const POSITION_KEY = "tvtc-chat-position";
   const HIDDEN_KEY = "tvtc-chat-hidden";
   let scheduled = false;
+  let playerHovering = false;
+  let trackedPlayer = null;
 
   function clamp(min, value, max) {
     return Math.min(Math.max(value, min), max);
@@ -21,7 +23,7 @@
 
   function setChatPosition(position) {
     localStorage.setItem(POSITION_KEY, position);
-    scheduleUpdate();
+    scheduleUpdate(true);
   }
 
   function isChatHidden() {
@@ -30,13 +32,14 @@
 
   function isEffectiveChatHidden() {
     const chat = findChatNode();
-    return isChatHidden() || !chat || /\bcollapsed\b/i.test(chat.className || "");
+    return isChatHidden() || isNativeChatCollapsed() || !chat || !hasChatContent();
   }
 
   function setChatHidden(hidden) {
     localStorage.setItem(HIDDEN_KEY, hidden ? "true" : "false");
     if (!hidden) clickNativeChatExpand();
-    scheduleUpdate();
+    scheduleUpdate(true);
+    window.setTimeout(() => scheduleUpdate(true), 150);
   }
 
   function isWatchPage() {
@@ -52,10 +55,30 @@
     return document.querySelector('[data-a-target="video-player"]');
   }
 
+  function hasChatContent() {
+    return Boolean(
+      document.querySelector('[data-a-target="right-column-chat-bar"]') ||
+        document.querySelector('[data-test-selector="chat-room-component-layout"]')
+    );
+  }
+
   function findChatNode() {
     const chatBar = document.querySelector('[data-a-target="right-column-chat-bar"]');
     const chatLayout = document.querySelector('[data-test-selector="chat-room-component-layout"]');
     return document.querySelector(".channel-root__right-column") || (chatBar && chatBar.parentElement) || (chatLayout && chatLayout.parentElement);
+  }
+
+  function findNativeChatButton(kind) {
+    const pattern = kind === "expand" ? /(expand|show)\s+chat|chat\s+(expand|show)/i : /(collapse|hide)\s+chat|chat\s+(collapse|hide)/i;
+    return Array.from(document.querySelectorAll("button[aria-label]")).find((button) => {
+      return !button.classList.contains("tvtc-icon-button") && pattern.test(button.getAttribute("aria-label") || "");
+    });
+  }
+
+  function isNativeChatCollapsed() {
+    const chat = findChatNode();
+    const chatClass = (chat && chat.className) || "";
+    return Boolean(findNativeChatButton("expand") || /\bcollapsed\b/i.test(chatClass));
   }
 
   function isTheaterMode() {
@@ -78,6 +101,7 @@
   function markLayoutNodes() {
     const player = getVideoPlayer();
     const chat = findChatNode();
+    trackPlayerHover(player);
 
     document.querySelectorAll("." + PLAYER_CLASS).forEach((node) => {
       if (node !== player) node.classList.remove(PLAYER_CLASS);
@@ -88,6 +112,32 @@
 
     if (player && !player.classList.contains(PLAYER_CLASS)) player.classList.add(PLAYER_CLASS);
     if (chat && !chat.classList.contains(CHAT_CLASS)) chat.classList.add(CHAT_CLASS);
+  }
+
+  function trackPlayerHover(player) {
+    if (trackedPlayer === player) return;
+
+    if (trackedPlayer) {
+      trackedPlayer.removeEventListener("pointerenter", handlePlayerEnter);
+      trackedPlayer.removeEventListener("pointerleave", handlePlayerLeave);
+    }
+
+    trackedPlayer = player || null;
+    playerHovering = false;
+
+    if (trackedPlayer) {
+      trackedPlayer.addEventListener("pointerenter", handlePlayerEnter, { passive: true });
+      trackedPlayer.addEventListener("pointerleave", handlePlayerLeave, { passive: true });
+    }
+  }
+
+  function handlePlayerEnter() {
+    playerHovering = true;
+  }
+
+  function handlePlayerLeave() {
+    playerHovering = false;
+    scheduleUpdate(true);
   }
 
   function updateLayoutVars() {
@@ -125,7 +175,7 @@
       'button[aria-label="Show Chat"]',
       'button[aria-label="Show chat"]'
     ];
-    const button = selectors.map((selector) => document.querySelector(selector)).find(Boolean);
+    const button = findNativeChatButton("expand") || selectors.map((selector) => document.querySelector(selector)).find(Boolean);
     if (button) button.click();
   }
 
@@ -235,13 +285,14 @@
     }
   }
 
-  function scheduleUpdate() {
+  function scheduleUpdate(force) {
+    if (playerHovering && !force) return;
     if (scheduled) return;
     scheduled = true;
     window.requestAnimationFrame(update);
   }
 
-  const observer = new MutationObserver(scheduleUpdate);
+  const observer = new MutationObserver(() => scheduleUpdate(false));
   observer.observe(document.documentElement, {
     childList: true,
     subtree: true,
@@ -249,24 +300,24 @@
     attributeFilter: ["class", "aria-label", "aria-pressed"]
   });
 
-  window.addEventListener("resize", scheduleUpdate, { passive: true });
-  window.addEventListener("orientationchange", scheduleUpdate, { passive: true });
-  window.addEventListener("popstate", scheduleUpdate);
+  window.addEventListener("resize", () => scheduleUpdate(true), { passive: true });
+  window.addEventListener("orientationchange", () => scheduleUpdate(true), { passive: true });
+  window.addEventListener("popstate", () => scheduleUpdate(true));
 
   const pushState = history.pushState;
   const replaceState = history.replaceState;
 
   history.pushState = function () {
     const result = pushState.apply(this, arguments);
-    scheduleUpdate();
+    scheduleUpdate(true);
     return result;
   };
 
   history.replaceState = function () {
     const result = replaceState.apply(this, arguments);
-    scheduleUpdate();
+    scheduleUpdate(true);
     return result;
   };
 
-  scheduleUpdate();
+  scheduleUpdate(true);
 })();
