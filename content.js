@@ -95,7 +95,12 @@
     );
   }
 
+  function isFullscreen() {
+    return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+
   function isActiveLayout() {
+    if (isFullscreen()) return false;
     return isWatchPage() && isVerticalLayout() && Date.now() >= suppressTheaterUntil && (isTheaterMode() || theaterSessionActive || Date.now() < theaterIntentUntil) && Boolean(getVideoPlayer());
   }
 
@@ -265,7 +270,9 @@
     const theaterButton = target.closest('[data-a-target="player-theatre-mode-button"]');
     if (theaterButton) {
       const label = theaterButton.getAttribute("aria-label") || "";
-      theaterSessionActive = !/exit (theatre|theater) mode/i.test(label);
+      const layoutActive = document.documentElement.classList.contains(ROOT_CLASS);
+      const isExiting = /exit (theatre|theater) mode/i.test(label) || layoutActive;
+      theaterSessionActive = !isExiting;
       if (theaterSessionActive) {
         theaterIntentUntil = Date.now() + 2500;
         suppressTheaterUntil = 0;
@@ -381,6 +388,8 @@
 
   document.addEventListener("pointerdown", handleDocumentPointerDown, true);
   document.addEventListener("keydown", handleDocumentKeyDown, true);
+  document.addEventListener("fullscreenchange", () => scheduleUpdate(true));
+  document.addEventListener("webkitfullscreenchange", () => scheduleUpdate(true));
   window.addEventListener("resize", () => scheduleUpdate(true), { passive: true });
   window.addEventListener("orientationchange", () => scheduleUpdate(true), { passive: true });
   window.addEventListener("popstate", () => scheduleUpdate(true));
