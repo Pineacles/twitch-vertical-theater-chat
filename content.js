@@ -323,7 +323,7 @@
     };
   }
 
-  window.tvtcDiagnose = function () {
+  function buildDiagnostic() {
     const player = document.querySelector("." + PLAYER_CLASS) || getVideoPlayer();
     const rect = player && player.getBoundingClientRect();
     const points = rect
@@ -351,7 +351,23 @@
         };
       })
     };
-  };
+  }
+
+  function installDiagnosticBridge() {
+    document.addEventListener("tvtc:diagnose", () => {
+      document.documentElement.setAttribute("data-tvtc-diagnostic", JSON.stringify(buildDiagnostic()));
+    });
+
+    const script = document.createElement("script");
+    script.textContent = [
+      "window.tvtcDiagnose = function () {",
+      "  document.dispatchEvent(new CustomEvent('tvtc:diagnose'));",
+      "  return JSON.parse(document.documentElement.getAttribute('data-tvtc-diagnostic') || '{}');",
+      "};"
+    ].join("\n");
+    (document.head || document.documentElement).appendChild(script);
+    script.remove();
+  }
 
   const observer = new MutationObserver((mutations) => {
     if (mutations.length && mutations.every(isIgnoredMutation)) return;
@@ -385,5 +401,6 @@
     return result;
   };
 
+  installDiagnosticBridge();
   scheduleUpdate(true);
 })();

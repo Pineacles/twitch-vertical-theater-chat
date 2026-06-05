@@ -20,7 +20,7 @@
 :root.tvtc-vertical-theater .tvtc-backdrop {
   position: fixed !important;
   inset: 0 !important;
-  z-index: 10 !important;
+  z-index: 2147480000 !important;
   display: block !important;
   background: #000 !important;
   pointer-events: none !important;
@@ -68,7 +68,7 @@
   min-height: 0 !important;
   max-width: none !important;
   max-height: var(--tvtc-player-height) !important;
-  z-index: 40 !important;
+  z-index: 2147480020 !important;
   transform: none !important;
   background: #000 !important;
   overflow: visible !important;
@@ -93,7 +93,9 @@
   border-left: 0 !important;
   border-top: 1px solid rgba(255, 255, 255, 0.14) !important;
   transform: none !important;
-  z-index: 30 !important;
+  z-index: 2147480010 !important;
+  overflow: hidden !important;
+  contain: layout paint size !important;
 }
 
 :root.tvtc-vertical-theater[data-tvtc-chat-hidden="true"] .tvtc-chat {
