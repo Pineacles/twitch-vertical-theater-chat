@@ -256,10 +256,10 @@
     fullscreenPendingTimer = window.setTimeout(function () {
       fullscreenPendingTimer = null;
       if (!isFullscreen()) {
-        dlog("fullscreen pending timeout fired, request never landed");
+        dlog("fullscreen pending failsafe: no fullscreen entered, restoring");
         setFullscreenClass(false);
       }
-    }, 300);
+    }, 1500);
   }
   function deactivateLayout() {
     dlog("deactivateLayout called", { hadRoot: document.documentElement.classList.contains(ROOT_CLASS) });
@@ -325,12 +325,6 @@
   function handleDocumentPointerDown(event) {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
-
-    const fullscreenButton = target.closest('[data-a-target="player-fullscreen-button"]');
-    if (fullscreenButton && !isFullscreen()) {
-      markFullscreenPending();
-      return;
-    }
 
     const theaterButton = target.closest('[data-a-target="player-theatre-mode-button"]');
     if (theaterButton) {
@@ -454,6 +448,20 @@
 
   document.addEventListener("pointerdown", handleDocumentPointerDown, true);
   document.addEventListener("keydown", handleDocumentKeyDown, true);
+  document.addEventListener("tvtc:fs-request", function () {
+    dlog("tvtc:fs-request received from main-world hook");
+    markFullscreenPending();
+  });
+  document.addEventListener("tvtc:fs-request-failed", function () {
+    dlog("tvtc:fs-request-failed received from main-world hook");
+    if (fullscreenPendingTimer) {
+      clearTimeout(fullscreenPendingTimer);
+      fullscreenPendingTimer = null;
+    }
+    if (!isFullscreen()) {
+      setFullscreenClass(false);
+    }
+  });
   function handleFullscreenChange() {
     dlog("fullscreenchange", {
       fsEl: describeEl(document.fullscreenElement),
