@@ -11,6 +11,7 @@
   let scheduled = false;
   let theaterSessionActive = false;
   let theaterIntentUntil = 0;
+  let suppressTheaterUntil = 0;
 
   localStorage.removeItem("tvtc-chat-hidden");
 
@@ -95,7 +96,7 @@
   }
 
   function isActiveLayout() {
-    return isWatchPage() && isVerticalLayout() && (isTheaterMode() || theaterSessionActive || Date.now() < theaterIntentUntil) && Boolean(getVideoPlayer());
+    return isWatchPage() && isVerticalLayout() && Date.now() >= suppressTheaterUntil && (isTheaterMode() || theaterSessionActive || Date.now() < theaterIntentUntil) && Boolean(getVideoPlayer());
   }
 
   function markLayoutNodes() {
@@ -226,7 +227,8 @@
     scheduled = false;
     markLayoutNodes();
     if (!isWatchPage() || !isVerticalLayout()) theaterSessionActive = false;
-    if (isTheaterMode()) theaterSessionActive = true;
+    const theaterActive = isTheaterMode();
+    if (theaterActive) theaterSessionActive = true;
     const active = isActiveLayout();
     document.documentElement.classList.toggle(ROOT_CLASS, active);
 
@@ -264,7 +266,13 @@
     if (theaterButton) {
       const label = theaterButton.getAttribute("aria-label") || "";
       theaterSessionActive = !/exit (theatre|theater) mode/i.test(label);
-      if (theaterSessionActive) theaterIntentUntil = Date.now() + 2500;
+      if (theaterSessionActive) {
+        theaterIntentUntil = Date.now() + 2500;
+        suppressTheaterUntil = 0;
+      } else {
+        theaterIntentUntil = 0;
+        suppressTheaterUntil = Date.now() + 1200;
+      }
       scheduleUpdate(true);
       window.setTimeout(() => scheduleUpdate(true), 0);
       window.setTimeout(() => scheduleUpdate(true), 16);
@@ -278,6 +286,15 @@
     if (label && /(expand|show|collapse|hide)\s+chat|chat\s+(expand|show|collapse|hide)/i.test(label)) {
       window.setTimeout(() => scheduleUpdate(true), 120);
     }
+  }
+
+  function handleDocumentKeyDown(event) {
+    if (event.key !== "Escape") return;
+    theaterSessionActive = false;
+    theaterIntentUntil = 0;
+    suppressTheaterUntil = Date.now() + 1200;
+    window.setTimeout(() => scheduleUpdate(true), 0);
+    window.setTimeout(() => scheduleUpdate(true), 120);
   }
 
   function isIgnoredMutation(mutation) {
@@ -363,6 +380,7 @@
   });
 
   document.addEventListener("pointerdown", handleDocumentPointerDown, true);
+  document.addEventListener("keydown", handleDocumentKeyDown, true);
   window.addEventListener("resize", () => scheduleUpdate(true), { passive: true });
   window.addEventListener("orientationchange", () => scheduleUpdate(true), { passive: true });
   window.addEventListener("popstate", () => scheduleUpdate(true));

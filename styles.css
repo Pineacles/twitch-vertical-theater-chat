@@ -2,6 +2,7 @@
   --tvtc-player-top: 0px;
   --tvtc-player-height: 56.25dvw;
   --tvtc-chat-height: 34dvh;
+  --tvtc-seam-overlap: 2px;
 }
 
 :root.tvtc-vertical-theater,
@@ -100,13 +101,15 @@
 }
 
 :root.tvtc-vertical-theater[data-tvtc-chat-position="bottom"] .tvtc-chat {
-  top: auto !important;
+  top: calc(100dvh - var(--tvtc-chat-height) - var(--tvtc-seam-overlap)) !important;
   bottom: 0 !important;
+  height: calc(var(--tvtc-chat-height) + var(--tvtc-seam-overlap)) !important;
 }
 
 :root.tvtc-vertical-theater[data-tvtc-chat-position="top"] .tvtc-chat {
   top: 0 !important;
   bottom: auto !important;
+  height: calc(var(--tvtc-chat-height) + var(--tvtc-seam-overlap)) !important;
 }
 
 :root.tvtc-vertical-theater .tvtc-controls {
@@ -198,6 +201,9 @@
 :root.tvtc-vertical-theater .channel-root__info,
 :root.tvtc-vertical-theater .channel-root__lower,
 :root.tvtc-vertical-theater .channel-panels,
+:root.tvtc-vertical-theater .channel-root__scroll-area,
+:root.tvtc-vertical-theater .channel-root__details,
+:root.tvtc-vertical-theater .channel-info-content,
 :root.tvtc-vertical-theater [data-a-target="channel-info-content"],
 :root.tvtc-vertical-theater [data-a-target="home-shelf"] {
   display: none !important;

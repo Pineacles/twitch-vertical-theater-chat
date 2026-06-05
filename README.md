@@ -31,7 +31,7 @@ In vertical theater mode, Twitch video overlay extension iframes/docks are hidde
 
 Run `tvtcDiagnose()` in the Twitch DevTools console to inspect which elements are hit-tested at the player corners.
 
-Version 1.1.6 removes the fixed black backdrop so it cannot cover Twitch chat inside Twitch's app stacking context.
+Version 1.1.7 closes tiny page-content gaps at the player/chat boundary and exits cleanly on Escape or theater mode off.
 
 ## Tuning
 
