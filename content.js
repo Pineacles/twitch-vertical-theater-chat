@@ -13,6 +13,19 @@
   let theaterIntentUntil = 0;
   let suppressTheaterUntil = 0;
 
+  const TVTC_DEBUG = true;
+  function dlog() {
+    if (!TVTC_DEBUG) return;
+    const args = ["[TVTC " + performance.now().toFixed(0) + "ms]"];
+    for (let i = 0; i < arguments.length; i++) args.push(arguments[i]);
+    console.log.apply(console, args);
+  }
+  function describeEl(el) {
+    if (!el) return null;
+    return el.tagName + (el.id ? "#" + el.id : "") + (el.className && typeof el.className === "string" ? "." + el.className.split(/\s+/).slice(0, 4).join(".") : "");
+  }
+  dlog("script loaded");
+
   localStorage.removeItem("tvtc-chat-hidden");
 
   function clamp(min, value, max) {
@@ -229,6 +242,7 @@
   }
 
   function deactivateLayout() {
+    dlog("deactivateLayout called", { hadRoot: document.documentElement.classList.contains(ROOT_CLASS) });
     document.documentElement.classList.remove(ROOT_CLASS);
     document.querySelectorAll("." + PLAYER_CLASS).forEach((node) => node.classList.remove(PLAYER_CLASS));
     document.querySelectorAll("." + CHAT_CLASS).forEach((node) => node.classList.remove(CHAT_CLASS));
@@ -244,7 +258,11 @@
 
   function update() {
     scheduled = false;
-    if (isFullscreen()) return;
+    const fs = isFullscreen();
+    if (fs) {
+      dlog("update: SKIPPED (fullscreen)", { fsEl: describeEl(document.fullscreenElement) });
+      return;
+    }
     markLayoutNodes();
     if (!isWatchPage() || !isVerticalLayout()) theaterSessionActive = false;
     const theaterActive = isTheaterMode();
@@ -252,6 +270,10 @@
       theaterSessionActive = theaterActive;
     }
     const active = isActiveLayout();
+    const wasActive = document.documentElement.classList.contains(ROOT_CLASS);
+    if (wasActive !== active) {
+      dlog("ROOT_CLASS toggle", { from: wasActive, to: active, theater: theaterActive, session: theaterSessionActive, vertical: isVerticalLayout(), suppressed: Date.now() < suppressTheaterUntil });
+    }
     document.documentElement.classList.toggle(ROOT_CLASS, active);
 
     if (active) {
@@ -384,6 +406,34 @@
     };
   }
 
+  function installFullscreenDebug() {
+    const script = document.createElement("script");
+    script.textContent = [
+      "window.tvtcDebug = function () {",
+      "  var fsEl = document.fullscreenElement;",
+      "  var cx = Math.round(window.innerWidth / 2);",
+      "  var cy = Math.round(window.innerHeight / 2);",
+      "  var stackEls = document.elementsFromPoint(cx, cy).slice(0, 8);",
+      "  var stack = stackEls.map(function (el) {",
+      "    var cs = getComputedStyle(el);",
+      "    return { tag: el.tagName, id: el.id, cls: (typeof el.className === 'string' ? el.className : ''), pe: cs.pointerEvents, pos: cs.position, z: cs.zIndex };",
+      "  });",
+      "  var report = {",
+      "    fullscreenElement: fsEl ? (fsEl.tagName + '.' + (typeof fsEl.className === 'string' ? fsEl.className : '')) : null,",
+      "    rootClasses: document.documentElement.className,",
+      "    bodyClasses: document.body.className,",
+      "    innerWidth: window.innerWidth, innerHeight: window.innerHeight,",
+      "    centerPoint: { x: cx, y: cy },",
+      "    stackAtCenter: stack",
+      "  };",
+      "  console.log('[TVTC tvtcDebug]', JSON.stringify(report, null, 2));",
+      "  return report;",
+      "};"
+    ].join("\n");
+    (document.head || document.documentElement).appendChild(script);
+    script.remove();
+  }
+
   function installDiagnosticBridge() {
     document.addEventListener("tvtc:diagnose", () => {
       document.documentElement.setAttribute("data-tvtc-diagnostic", JSON.stringify(buildDiagnostic()));
@@ -413,6 +463,12 @@
   document.addEventListener("pointerdown", handleDocumentPointerDown, true);
   document.addEventListener("keydown", handleDocumentKeyDown, true);
   function handleFullscreenChange() {
+    dlog("fullscreenchange", {
+      fsEl: describeEl(document.fullscreenElement),
+      webkitFsEl: describeEl(document.webkitFullscreenElement),
+      isFs: isFullscreen(),
+      rootClass: document.documentElement.classList.contains(ROOT_CLASS)
+    });
     if (isFullscreen()) {
       deactivateLayout();
       return;
@@ -449,5 +505,6 @@
   };
 
   installDiagnosticBridge();
+  installFullscreenDebug();
   scheduleUpdate(true);
 })();
