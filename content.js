@@ -1,6 +1,8 @@
 (function () {
   const ROOT_CLASS = "tvtc-vertical-theater";
   const DEBUG_CLASS = "tvtc-debug";
+  const PLAYER_CLASS = "tvtc-player";
+  const CHAT_CLASS = "tvtc-chat";
   let scheduled = false;
 
   function isWatchPage() {
@@ -33,8 +35,28 @@
     );
   }
 
+  function markLayoutNodes() {
+    const videoPlayer = document.querySelector('[data-a-target="video-player"]');
+    const player = videoPlayer && (videoPlayer.closest(".persistent-player") || videoPlayer.closest(".channel-root__player"));
+
+    const chatBar = document.querySelector('[data-a-target="right-column-chat-bar"]');
+    const chatLayout = document.querySelector('[data-test-selector="chat-room-component-layout"]');
+    const chat = document.querySelector(".channel-root__right-column") || (chatBar && chatBar.parentElement) || (chatLayout && chatLayout.parentElement);
+
+    document.querySelectorAll("." + PLAYER_CLASS).forEach((node) => {
+      if (node !== player) node.classList.remove(PLAYER_CLASS);
+    });
+    document.querySelectorAll("." + CHAT_CLASS).forEach((node) => {
+      if (node !== chat) node.classList.remove(CHAT_CLASS);
+    });
+
+    if (player && !player.classList.contains(PLAYER_CLASS)) player.classList.add(PLAYER_CLASS);
+    if (chat && !chat.classList.contains(CHAT_CLASS)) chat.classList.add(CHAT_CLASS);
+  }
+
   function update() {
     scheduled = false;
+    markLayoutNodes();
     const active = isWatchPage() && isVerticalLayout() && hasVisibleChat() && isTheaterMode();
     document.documentElement.classList.toggle(ROOT_CLASS, active);
 

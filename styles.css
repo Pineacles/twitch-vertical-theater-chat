@@ -1,46 +1,64 @@
 :root.tvtc-vertical-theater {
-  --tvtc-chat-height: min(42vh, 420px);
+  --tvtc-chat-height: clamp(280px, 38dvh, 430px);
+  --tvtc-player-height: calc(100dvh - var(--tvtc-chat-height));
+}
+
+:root.tvtc-vertical-theater,
+:root.tvtc-vertical-theater body {
+  height: 100dvh !important;
+  overflow: hidden !important;
 }
 
 :root.tvtc-vertical-theater .channel-root__main,
 :root.tvtc-vertical-theater .channel-root__content {
-  display: flex !important;
-  flex-direction: column !important;
-  height: 100vh !important;
-  min-height: 100vh !important;
+  display: block !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
   overflow: hidden !important;
 }
 
 :root.tvtc-vertical-theater .channel-root__player,
+:root.tvtc-vertical-theater .tvtc-player,
 :root.tvtc-vertical-theater .persistent-player,
-:root.tvtc-vertical-theater .persistent-player--theatre,
-:root.tvtc-vertical-theater [data-a-target="video-player"] {
-  order: 1 !important;
+:root.tvtc-vertical-theater .persistent-player--theatre {
+  position: fixed !important;
+  inset: 0 0 auto 0 !important;
   width: 100% !important;
-  height: calc(100vh - var(--tvtc-chat-height)) !important;
+  height: var(--tvtc-player-height) !important;
   min-height: 0 !important;
-  max-height: calc(100vh - var(--tvtc-chat-height)) !important;
-  flex: 1 1 auto !important;
+  max-height: var(--tvtc-player-height) !important;
+  z-index: 10 !important;
 }
 
-:root.tvtc-vertical-theater .channel-root__right-column {
-  position: relative !important;
-  inset: auto !important;
-  right: auto !important;
-  top: auto !important;
-  bottom: auto !important;
-  order: 2 !important;
+:root.tvtc-vertical-theater [data-a-target="video-player"],
+:root.tvtc-vertical-theater .video-player,
+:root.tvtc-vertical-theater .video-player__container,
+:root.tvtc-vertical-theater .video-ref {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+:root.tvtc-vertical-theater video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+}
+
+:root.tvtc-vertical-theater .channel-root__right-column,
+:root.tvtc-vertical-theater .tvtc-chat {
+  position: fixed !important;
+  inset: auto 0 0 0 !important;
   width: 100% !important;
   min-width: 0 !important;
   max-width: none !important;
   height: var(--tvtc-chat-height) !important;
   min-height: 220px !important;
-  max-height: 45vh !important;
-  flex: 0 0 var(--tvtc-chat-height) !important;
+  max-height: var(--tvtc-chat-height) !important;
   border-left: 0 !important;
   border-top: 1px solid rgba(255, 255, 255, 0.14) !important;
   transform: none !important;
-  z-index: 20 !important;
+  z-index: 30 !important;
 }
 
 :root.tvtc-vertical-theater [data-a-target="right-column-chat-bar"],
@@ -57,5 +75,14 @@
 }
 
 :root.tvtc-vertical-theater .channel-root__right-column--collapsed {
+  display: none !important;
+}
+
+:root.tvtc-vertical-theater .channel-root__info,
+:root.tvtc-vertical-theater .channel-root__lower,
+:root.tvtc-vertical-theater .channel-panels,
+:root.tvtc-vertical-theater [data-a-target="channel-info-content"],
+:root.tvtc-vertical-theater [data-a-target="home-shelf"],
+:root.tvtc-vertical-theater main [class*="Layout-sc"]:has(.channel-info-content) {
   display: none !important;
 }
