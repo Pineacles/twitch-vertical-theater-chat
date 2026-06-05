@@ -252,16 +252,14 @@
   function markFullscreenPending() {
     dlog("markFullscreenPending");
     setFullscreenClass(true);
-    deactivateLayout();
     if (fullscreenPendingTimer) clearTimeout(fullscreenPendingTimer);
     fullscreenPendingTimer = window.setTimeout(function () {
       fullscreenPendingTimer = null;
       if (!isFullscreen()) {
         dlog("fullscreen pending timeout fired, request never landed");
         setFullscreenClass(false);
-        scheduleUpdate(true);
       }
-    }, 2000);
+    }, 300);
   }
   function isInputFocused() {
     const el = document.activeElement;
@@ -386,6 +384,7 @@
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
     if (isFullscreen()) return;
+    if (target.closest("button")) return;
     if (target.closest('[data-a-target="video-player"]')) {
       markFullscreenPending();
     }
