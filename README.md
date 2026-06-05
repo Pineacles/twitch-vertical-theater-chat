@@ -23,6 +23,8 @@ The extension also detects Twitch-native collapsed chat when resizing from horiz
 
 Player positioning is applied to the outer Twitch player wrapper, not the internal player/control node, so Twitch's native hover controls and quality menu can keep their own behavior.
 
+The extension ignores Twitch player/chat subtree mutations while active, so player hover controls and menus are not reset by layout updates.
+
 ## Tuning
 
 To change the chat height, edit `styles.css`:

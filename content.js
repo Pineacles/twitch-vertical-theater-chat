@@ -14,6 +14,7 @@
   let playerHovering = false;
   let trackedPlayer = null;
   let suppressPlayerMutationUntil = 0;
+  let theaterSessionActive = false;
 
   function clamp(min, value, max) {
     return Math.min(Math.max(value, min), max);
@@ -97,7 +98,7 @@
   }
 
   function isActiveLayout() {
-    return isWatchPage() && isVerticalLayout() && isTheaterMode() && Boolean(getVideoPlayer());
+    return isWatchPage() && isVerticalLayout() && (isTheaterMode() || theaterSessionActive) && Boolean(getVideoPlayer());
   }
 
   function markLayoutNodes() {
@@ -272,6 +273,8 @@
   function update() {
     scheduled = false;
     markLayoutNodes();
+    if (!isWatchPage() || !isVerticalLayout()) theaterSessionActive = false;
+    if (isTheaterMode()) theaterSessionActive = true;
     const active = isActiveLayout();
     document.documentElement.classList.toggle(ROOT_CLASS, active);
 
@@ -303,17 +306,55 @@
     window.requestAnimationFrame(update);
   }
 
-  const observer = new MutationObserver(() => scheduleUpdate(false));
+  function handleDocumentClick(event) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+
+    const theaterButton = target.closest('[data-a-target="player-theatre-mode-button"]');
+    if (theaterButton) {
+      theaterSessionActive = !document.documentElement.classList.contains(ROOT_CLASS);
+      scheduleUpdate(true);
+      window.setTimeout(() => scheduleUpdate(true), 80);
+      window.setTimeout(() => scheduleUpdate(true), 300);
+      return;
+    }
+
+    const labelledButton = target.closest("button[aria-label]");
+    const label = labelledButton && labelledButton.getAttribute("aria-label");
+    if (label && /(expand|show|collapse|hide)\s+chat|chat\s+(expand|show|collapse|hide)/i.test(label)) {
+      window.setTimeout(() => scheduleUpdate(true), 120);
+    }
+  }
+
+  function isIgnoredMutation(mutation) {
+    const target = mutation.target instanceof Element ? mutation.target : mutation.target.parentElement;
+    if (!target) return false;
+
+    return Boolean(
+      target.closest("." + PLAYER_CLASS) ||
+        target.closest("." + PLAYER_INNER_CLASS) ||
+        target.closest("." + CHAT_CLASS) ||
+        target.closest("." + CONTROLS_CLASS) ||
+        target.closest('[data-a-target="video-player"]')
+    );
+  }
+
+  const observer = new MutationObserver((mutations) => {
+    if (mutations.length && mutations.every(isIgnoredMutation)) return;
+    scheduleUpdate(false);
+  });
   observer.observe(document.documentElement, {
     childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ["class", "aria-label", "aria-pressed"]
+    subtree: true
   });
 
+  document.addEventListener("click", handleDocumentClick, true);
   window.addEventListener("resize", () => scheduleUpdate(true), { passive: true });
   window.addEventListener("orientationchange", () => scheduleUpdate(true), { passive: true });
   window.addEventListener("popstate", () => scheduleUpdate(true));
+  window.setInterval(() => {
+    if (!document.documentElement.classList.contains(ROOT_CLASS)) scheduleUpdate(false);
+  }, 1000);
 
   const pushState = history.pushState;
   const replaceState = history.replaceState;
