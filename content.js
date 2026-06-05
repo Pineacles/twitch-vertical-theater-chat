@@ -233,7 +233,9 @@
     markLayoutNodes();
     if (!isWatchPage() || !isVerticalLayout()) theaterSessionActive = false;
     const theaterActive = isTheaterMode();
-    if (theaterActive) theaterSessionActive = true;
+    if (Date.now() >= suppressTheaterUntil) {
+      theaterSessionActive = theaterActive;
+    }
     const active = isActiveLayout();
     document.documentElement.classList.toggle(ROOT_CLASS, active);
 
