@@ -293,6 +293,12 @@
     const wasActive = document.documentElement.classList.contains(ROOT_CLASS);
     if (wasActive !== active) {
       dlog("ROOT_CLASS toggle", { from: wasActive, to: active, theater: theaterActive, session: theaterSessionActive, vertical: isVerticalLayout(), suppressed: Date.now() < suppressTheaterUntil });
+      if (isNativeChatCollapsed() && (!active || !isChatHidden())) {
+        dlog("auto-expanding native chat on layout transition");
+        clickNativeChatExpand();
+        window.setTimeout(() => scheduleUpdate(true), 100);
+        window.setTimeout(() => scheduleUpdate(true), 300);
+      }
     }
     document.documentElement.classList.toggle(ROOT_CLASS, active);
 
