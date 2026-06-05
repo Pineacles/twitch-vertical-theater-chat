@@ -57,29 +57,15 @@
   min-height: 0 !important;
   max-width: none !important;
   max-height: var(--tvtc-player-height) !important;
-  z-index: 60 !important;
+  z-index: 40 !important;
   transform: none !important;
   background: #000 !important;
   overflow: visible !important;
   pointer-events: auto !important;
 }
 
-:root.tvtc-vertical-theater .tvtc-player,
-:root.tvtc-vertical-theater .tvtc-player > div,
-:root.tvtc-vertical-theater .tvtc-player-inner {
+:root.tvtc-vertical-theater .tvtc-player {
   box-sizing: border-box !important;
-}
-
-:root.tvtc-vertical-theater .tvtc-player-inner {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: 100% !important;
-  max-height: 100% !important;
-  overflow: visible !important;
-}
-
-:root.tvtc-vertical-theater .tvtc-player-inner video {
-  object-fit: contain !important;
 }
 
 :root.tvtc-vertical-theater .tvtc-chat {
@@ -96,7 +82,7 @@
   border-left: 0 !important;
   border-top: 1px solid rgba(255, 255, 255, 0.14) !important;
   transform: none !important;
-  z-index: 50 !important;
+  z-index: 30 !important;
 }
 
 :root.tvtc-vertical-theater[data-tvtc-chat-hidden="true"] .tvtc-chat {
@@ -115,7 +101,8 @@
 
 :root.tvtc-vertical-theater .tvtc-controls {
   position: fixed !important;
-  right: 10px !important;
+  left: 10px !important;
+  right: auto !important;
   z-index: 2147483647 !important;
   display: flex !important;
   gap: 6px !important;
@@ -131,7 +118,7 @@
 }
 
 :root.tvtc-vertical-theater[data-tvtc-chat-position="bottom"] .tvtc-controls {
-  top: calc(100dvh - var(--tvtc-chat-height) + 8px) !important;
+  top: 8px !important;
   bottom: auto !important;
 }
 

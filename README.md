@@ -25,6 +25,8 @@ Player positioning is applied to the outer Twitch player wrapper, not the intern
 
 The extension ignores Twitch player/chat subtree mutations while active, so player hover controls and menus are not reset by layout updates.
 
+The extension does not attach listeners or layout classes to Twitch's internal video-player node. Only the outer player wrapper is positioned.
+
 ## Tuning
 
 To change the chat height, edit `styles.css`:

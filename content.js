@@ -2,7 +2,6 @@
   const ROOT_CLASS = "tvtc-vertical-theater";
   const DEBUG_CLASS = "tvtc-debug";
   const PLAYER_CLASS = "tvtc-player";
-  const PLAYER_INNER_CLASS = "tvtc-player-inner";
   const CHAT_CLASS = "tvtc-chat";
   const BACKDROP_CLASS = "tvtc-backdrop";
   const CONTROLS_CLASS = "tvtc-controls";
@@ -11,9 +10,6 @@
   const POSITION_KEY = "tvtc-chat-position";
   const HIDDEN_KEY = "tvtc-chat-hidden";
   let scheduled = false;
-  let playerHovering = false;
-  let trackedPlayer = null;
-  let suppressPlayerMutationUntil = 0;
   let theaterSessionActive = false;
 
   function clamp(min, value, max) {
@@ -105,51 +101,21 @@
     const videoPlayer = getVideoPlayer();
     const player = findPlayerWrapper(videoPlayer) || videoPlayer;
     const chat = findChatNode();
-    trackPlayerHover(videoPlayer || player);
 
-    document.querySelectorAll("." + PLAYER_CLASS + ", ." + PLAYER_INNER_CLASS).forEach((node) => {
+    document.querySelectorAll("." + PLAYER_CLASS).forEach((node) => {
       if (node !== player) node.classList.remove(PLAYER_CLASS);
-      if (node !== videoPlayer) node.classList.remove(PLAYER_INNER_CLASS);
     });
     document.querySelectorAll("." + CHAT_CLASS).forEach((node) => {
       if (node !== chat) node.classList.remove(CHAT_CLASS);
     });
 
     if (player && !player.classList.contains(PLAYER_CLASS)) player.classList.add(PLAYER_CLASS);
-    if (videoPlayer && !videoPlayer.classList.contains(PLAYER_INNER_CLASS)) videoPlayer.classList.add(PLAYER_INNER_CLASS);
     if (chat && !chat.classList.contains(CHAT_CLASS)) chat.classList.add(CHAT_CLASS);
   }
 
   function findPlayerWrapper(videoPlayer) {
     if (!videoPlayer) return null;
     return videoPlayer.closest(".persistent-player") || videoPlayer.closest(".channel-root__player") || videoPlayer.parentElement;
-  }
-
-  function trackPlayerHover(player) {
-    if (trackedPlayer === player) return;
-
-    if (trackedPlayer) {
-      trackedPlayer.removeEventListener("pointerenter", handlePlayerEnter);
-      trackedPlayer.removeEventListener("pointerleave", handlePlayerLeave);
-    }
-
-    trackedPlayer = player || null;
-    playerHovering = false;
-
-    if (trackedPlayer) {
-      trackedPlayer.addEventListener("pointerenter", handlePlayerEnter, { passive: true });
-      trackedPlayer.addEventListener("pointerleave", handlePlayerLeave, { passive: true });
-    }
-  }
-
-  function handlePlayerEnter() {
-    playerHovering = true;
-    suppressPlayerMutationUntil = Date.now() + 1500;
-  }
-
-  function handlePlayerLeave() {
-    playerHovering = false;
-    suppressPlayerMutationUntil = Date.now() + 1500;
   }
 
   function updateLayoutVars() {
@@ -300,20 +266,21 @@
   }
 
   function scheduleUpdate(force) {
-    if (!force && (playerHovering || Date.now() < suppressPlayerMutationUntil)) return;
     if (scheduled) return;
     scheduled = true;
     window.requestAnimationFrame(update);
   }
 
-  function handleDocumentClick(event) {
+  function handleDocumentPointerDown(event) {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
 
     const theaterButton = target.closest('[data-a-target="player-theatre-mode-button"]');
     if (theaterButton) {
-      theaterSessionActive = !document.documentElement.classList.contains(ROOT_CLASS);
+      const label = theaterButton.getAttribute("aria-label") || "";
+      theaterSessionActive = !/exit (theatre|theater) mode/i.test(label);
       scheduleUpdate(true);
+      window.setTimeout(() => scheduleUpdate(true), 0);
       window.setTimeout(() => scheduleUpdate(true), 80);
       window.setTimeout(() => scheduleUpdate(true), 300);
       return;
@@ -332,7 +299,6 @@
 
     return Boolean(
       target.closest("." + PLAYER_CLASS) ||
-        target.closest("." + PLAYER_INNER_CLASS) ||
         target.closest("." + CHAT_CLASS) ||
         target.closest("." + CONTROLS_CLASS) ||
         target.closest('[data-a-target="video-player"]')
@@ -348,7 +314,7 @@
     subtree: true
   });
 
-  document.addEventListener("click", handleDocumentClick, true);
+  document.addEventListener("pointerdown", handleDocumentPointerDown, true);
   window.addEventListener("resize", () => scheduleUpdate(true), { passive: true });
   window.addEventListener("orientationchange", () => scheduleUpdate(true), { passive: true });
   window.addEventListener("popstate", () => scheduleUpdate(true));

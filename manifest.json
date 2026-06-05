@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Twitch Vertical Theater Chat",
   "description": "Moves Twitch chat below the video when Theater Mode is used in a vertical or narrow Brave window.",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "content_scripts": [
     {
       "matches": [
