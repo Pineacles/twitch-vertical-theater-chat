@@ -14,19 +14,6 @@
   let theaterIntentUntil = 0;
   let suppressTheaterUntil = 0;
 
-  const TVTC_DEBUG = true;
-  function dlog() {
-    if (!TVTC_DEBUG) return;
-    const args = ["[TVTC " + performance.now().toFixed(0) + "ms]"];
-    for (let i = 0; i < arguments.length; i++) args.push(arguments[i]);
-    console.log.apply(console, args);
-  }
-  function describeEl(el) {
-    if (!el) return null;
-    return el.tagName + (el.id ? "#" + el.id : "") + (el.className && typeof el.className === "string" ? "." + el.className.split(/\s+/).slice(0, 4).join(".") : "");
-  }
-  dlog("script loaded");
-
   localStorage.removeItem("tvtc-chat-hidden");
 
   function clamp(min, value, max) {
@@ -91,10 +78,8 @@
   }
 
   function isNativeChatCollapsed() {
-    const chat = findChatNode();
-    if (!chat) return true;
-    const chatClass = chat.className || "";
-    return /\bcollapsed\b/i.test(chatClass);
+    if (!findChatNode()) return true;
+    return Boolean(findNativeChatButton("expand"));
   }
 
   function isTheaterMode() {
@@ -185,7 +170,6 @@
         }
       }
     }
-    dlog("clickNativeChatExpand", { buttonFound: Boolean(button), button: describeEl(button) });
     if (button) button.click();
   }
 
@@ -258,22 +242,18 @@
     const had = document.documentElement.classList.contains(FS_CLASS);
     if (had === on) return;
     document.documentElement.classList.toggle(FS_CLASS, on);
-    dlog("setFullscreenClass", { on: on });
   }
   function markFullscreenPending() {
-    dlog("markFullscreenPending");
     setFullscreenClass(true);
     if (fullscreenPendingTimer) clearTimeout(fullscreenPendingTimer);
     fullscreenPendingTimer = window.setTimeout(function () {
       fullscreenPendingTimer = null;
       if (!isFullscreen()) {
-        dlog("fullscreen pending failsafe: no fullscreen entered, restoring");
         setFullscreenClass(false);
       }
     }, 1500);
   }
   function deactivateLayout() {
-    dlog("deactivateLayout called", { hadRoot: document.documentElement.classList.contains(ROOT_CLASS) });
     document.documentElement.classList.remove(ROOT_CLASS);
     document.querySelectorAll("." + PLAYER_CLASS).forEach((node) => node.classList.remove(PLAYER_CLASS));
     document.querySelectorAll("." + CHAT_CLASS).forEach((node) => node.classList.remove(CHAT_CLASS));
@@ -289,11 +269,7 @@
 
   function update() {
     scheduled = false;
-    const fs = isFullscreen();
-    if (fs) {
-      dlog("update: SKIPPED (fullscreen)", { fsEl: describeEl(document.fullscreenElement) });
-      return;
-    }
+    if (isFullscreen()) return;
     markLayoutNodes();
     if (!isWatchPage() || !isVerticalLayout()) theaterSessionActive = false;
     const theaterActive = isTheaterMode();
@@ -301,10 +277,6 @@
       theaterSessionActive = theaterActive;
     }
     const active = isActiveLayout();
-    const wasActive = document.documentElement.classList.contains(ROOT_CLASS);
-    if (wasActive !== active) {
-      dlog("ROOT_CLASS toggle", { from: wasActive, to: active, theater: theaterActive, session: theaterSessionActive, vertical: isVerticalLayout(), suppressed: Date.now() < suppressTheaterUntil });
-    }
     document.documentElement.classList.toggle(ROOT_CLASS, active);
 
     if (active) {
@@ -460,11 +432,9 @@
   document.addEventListener("pointerdown", handleDocumentPointerDown, true);
   document.addEventListener("keydown", handleDocumentKeyDown, true);
   document.addEventListener("tvtc:fs-request", function () {
-    dlog("tvtc:fs-request received from main-world hook");
     markFullscreenPending();
   });
   document.addEventListener("tvtc:fs-request-failed", function () {
-    dlog("tvtc:fs-request-failed received from main-world hook");
     if (fullscreenPendingTimer) {
       clearTimeout(fullscreenPendingTimer);
       fullscreenPendingTimer = null;
@@ -474,12 +444,6 @@
     }
   });
   function handleFullscreenChange() {
-    dlog("fullscreenchange", {
-      fsEl: describeEl(document.fullscreenElement),
-      isFs: isFullscreen(),
-      rootClass: document.documentElement.classList.contains(ROOT_CLASS),
-      fsClass: document.documentElement.classList.contains(FS_CLASS)
-    });
     if (fullscreenPendingTimer) {
       clearTimeout(fullscreenPendingTimer);
       fullscreenPendingTimer = null;
