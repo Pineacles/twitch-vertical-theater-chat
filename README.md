@@ -17,7 +17,7 @@ Unpacked Brave/Chrome extension that moves Twitch chat below the video when:
 
 5. Open a Twitch stream, click Theater Mode, and make the Brave window vertical or narrow.
 
-In vertical Theater Mode, the Twitch top bar is hidden and chat gets the space that is not needed by the 16:9 video. Use the floating icon buttons to move chat between top/bottom or hide/show chat.
+In vertical Theater Mode, the Twitch top bar is hidden and chat gets the space that is not needed by the 16:9 video. Use the floating icon buttons to move chat between top/bottom or hide/show chat. When chat is hidden or Twitch collapses it, the player uses the full viewport over a black theater backdrop.
 
 ## Tuning
 

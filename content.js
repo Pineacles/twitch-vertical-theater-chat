@@ -3,6 +3,7 @@
   const DEBUG_CLASS = "tvtc-debug";
   const PLAYER_CLASS = "tvtc-player";
   const CHAT_CLASS = "tvtc-chat";
+  const BACKDROP_CLASS = "tvtc-backdrop";
   const CONTROLS_CLASS = "tvtc-controls";
   const POSITION_BUTTON_CLASS = "tvtc-position-action";
   const VISIBILITY_BUTTON_CLASS = "tvtc-visibility-action";
@@ -25,6 +26,11 @@
 
   function isChatHidden() {
     return localStorage.getItem(HIDDEN_KEY) === "true";
+  }
+
+  function isEffectiveChatHidden() {
+    const chat = findChatNode();
+    return isChatHidden() || !chat || /\bcollapsed\b/i.test(chat.className || "");
   }
 
   function setChatHidden(hidden) {
@@ -87,7 +93,7 @@
   function updateLayoutVars() {
     const availableHeight = Math.max(360, window.innerHeight);
     const availableWidth = Math.max(320, window.innerWidth);
-    const hidden = isChatHidden();
+    const hidden = isEffectiveChatHidden();
     let playerHeight = availableHeight;
     let chatHeight = 0;
 
@@ -100,7 +106,7 @@
     }
 
     const chatPosition = getChatPosition();
-    const playerTop = !hidden && chatPosition === "top" ? chatHeight : 0;
+    const playerTop = hidden ? Math.round((availableHeight - playerHeight) / 2) : (chatPosition === "top" ? chatHeight : 0);
     const style = document.documentElement.style;
 
     style.setProperty("--tvtc-player-top", playerTop + "px");
@@ -144,6 +150,32 @@
     return button;
   }
 
+  function updateButton(button, iconName, label, onClick) {
+    if (button.dataset.tvtcIcon !== iconName) {
+      button.innerHTML = iconSvg(iconName);
+      button.dataset.tvtcIcon = iconName;
+    }
+
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.onclick = onClick;
+  }
+
+  function ensureBackdrop(active) {
+    let backdrop = document.querySelector("." + BACKDROP_CLASS);
+
+    if (!active) {
+      if (backdrop) backdrop.remove();
+      return;
+    }
+
+    if (!backdrop) {
+      backdrop = document.createElement("div");
+      backdrop.className = BACKDROP_CLASS;
+      document.body.appendChild(backdrop);
+    }
+  }
+
   function ensureControls(active) {
     let controls = document.querySelector("." + CONTROLS_CLASS);
 
@@ -161,25 +193,19 @@
     const positionButton = ensureButton(controls, POSITION_BUTTON_CLASS);
     const visibilityButton = ensureButton(controls, VISIBILITY_BUTTON_CLASS);
     const nextPosition = getChatPosition() === "top" ? "bottom" : "top";
-    const hidden = isChatHidden();
+    const hidden = isEffectiveChatHidden();
 
-    positionButton.innerHTML = iconSvg(nextPosition === "top" ? "up" : "down");
-    positionButton.title = "Move chat to " + nextPosition;
-    positionButton.setAttribute("aria-label", "Move chat to " + nextPosition);
-    positionButton.onclick = (event) => {
+    updateButton(positionButton, nextPosition === "top" ? "up" : "down", "Move chat to " + nextPosition, (event) => {
       event.preventDefault();
       event.stopPropagation();
       setChatPosition(nextPosition);
-    };
+    });
 
-    visibilityButton.innerHTML = iconSvg(hidden ? "show" : "hide");
-    visibilityButton.title = hidden ? "Show chat" : "Hide chat";
-    visibilityButton.setAttribute("aria-label", hidden ? "Show chat" : "Hide chat");
-    visibilityButton.onclick = (event) => {
+    updateButton(visibilityButton, hidden ? "show" : "hide", hidden ? "Show chat" : "Hide chat", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      setChatHidden(!isChatHidden());
-    };
+      setChatHidden(!hidden);
+    });
   }
 
   function update() {
@@ -192,6 +218,7 @@
       updateLayoutVars();
     }
 
+    ensureBackdrop(active);
     ensureControls(active);
 
     if (document.documentElement.classList.contains(DEBUG_CLASS)) {
@@ -200,7 +227,7 @@
         vertical: isVerticalLayout(),
         theater: isTheaterMode(),
         chat: Boolean(findChatNode()),
-        hidden: isChatHidden(),
+        hidden: isEffectiveChatHidden(),
         position: getChatPosition(),
         width: window.innerWidth,
         height: window.innerHeight
