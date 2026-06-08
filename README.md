@@ -1,44 +1,49 @@
 # Twitch Vertical Theater Chat
 
-Unpacked Brave/Chrome extension that moves Twitch chat below the video when:
+A Chromium browser extension that moves Twitch chat below the video when Theater Mode is used in a vertical or narrow window.
 
-- You are on a Twitch watch page.
-- Twitch Theater Mode is active.
-- The browser window is vertical or narrow.
+## What it does
 
-## Install in Brave
+When all of the following are true:
 
-1. Open `brave://extensions`.
+- You are on a Twitch watch page
+- Twitch Theater Mode is active
+- The browser window is taller than it is wide, or narrower than 820px
+
+…the extension repositions the player to fill the width of the window and places chat below it, using the leftover vertical space. Floating icon buttons let you swap chat between top and bottom, or hide chat entirely so the player can use the full viewport.
+
+The extension also:
+
+- Detects Twitch's collapsed chat state and mirrors it in the vertical layout
+- Restores Twitch's native layout when fullscreen is entered, so player controls and hover behavior remain intact
+- Restores Twitch's native layout when you exit Theater Mode, leave the watch page, or widen the window
+
+## Install (developer mode)
+
+The extension is not yet on the Chrome Web Store. To use it, load it as an unpacked extension in any Chromium-based browser (Chrome, Brave, Edge, Arc, Vivaldi, Opera, etc.):
+
+1. Open your browser's extensions page:
+   - Chrome: `chrome://extensions`
+   - Brave: `brave://extensions`
+   - Edge: `edge://extensions`
+   - Other Chromium browsers: see their docs
 2. Enable **Developer mode**.
 3. Click **Load unpacked**.
-4. Select this folder:
+4. Select the folder containing this repository.
+5. Open a Twitch stream, enable Theater Mode, and resize the window to be vertical or narrow.
 
-   `C:\Users\RoosM\Desktop\Projects\twitch-vertical-theater-chat`
-
-5. Open a Twitch stream, click Theater Mode, and make the Brave window vertical or narrow.
-
-In vertical Theater Mode, the Twitch top bar is hidden and chat gets the space that is not needed by the 16:9 video. Use the floating icon buttons to move chat between top/bottom or hide/show chat. When chat is hidden or Twitch collapses it, the player uses the full viewport over a black theater backdrop.
-
-The extension also detects Twitch-native collapsed chat when resizing from horizontal to vertical, and it pauses layout recalculation while hovering the player so Twitch's quality/settings controls stay usable.
-
-Player positioning is applied to the outer Twitch player wrapper, not the internal player/control node, so Twitch's native hover controls and quality menu can keep their own behavior.
-
-The extension ignores Twitch player/chat subtree mutations while active, so player hover controls and menus are not reset by layout updates.
-
-The extension does not attach listeners or layout classes to Twitch's internal video-player node. Only the outer player wrapper is positioned.
-
-In vertical theater mode, Twitch video overlay extension iframes/docks are hidden because they can cover the player controls and break hover behavior near the bottom-right control group.
-
-Run `tvtcDiagnose()` in the Twitch DevTools console to inspect which elements are hit-tested at the player corners.
-
-Version 1.1.7 closes tiny page-content gaps at the player/chat boundary and exits cleanly on Escape or theater mode off.
+A packaged store release is planned for a future version.
 
 ## Tuning
 
-To change the chat height, edit `styles.css`:
+Default chat sizing is defined in `styles.css`:
 
 ```css
---tvtc-chat-height: min(42vh, 420px);
+--tvtc-chat-height: 34dvh;
 ```
 
-For example, `min(50vh, 520px)` makes chat taller.
+Increase or decrease the value to make chat taller or shorter.
+
+## Compatibility
+
+Requires a Chromium browser with native CSS nesting support (Chrome 112+, released April 2023). Firefox is not supported.

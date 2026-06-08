@@ -1,20 +1,44 @@
 (function () {
   const ROOT_CLASS = "tvtc-vertical-theater";
-  const DEBUG_CLASS = "tvtc-debug";
   const PLAYER_CLASS = "tvtc-player";
   const CHAT_CLASS = "tvtc-chat";
   const FS_CLASS = "tvtc-fs";
   const CONTROLS_CLASS = "tvtc-controls";
+  const ICON_BUTTON_CLASS = "tvtc-icon-button";
   const POSITION_BUTTON_CLASS = "tvtc-position-action";
   const VISIBILITY_BUTTON_CLASS = "tvtc-visibility-action";
+
   const POSITION_KEY = "tvtc-chat-position";
   const HIDDEN_KEY = "tvtc-chat-hidden-v2";
+
+  const VERTICAL_BREAKPOINT_PX = 820;
+  const THEATER_INTENT_MS = 2500;
+  const SUPPRESS_THEATER_MS = 1200;
+  const FULLSCREEN_FAILSAFE_MS = 1500;
+  const POST_ACTION_REFRESH_MS = [0, 16, 80, 300];
+  const IDLE_REFRESH_INTERVAL_MS = 1000;
+  const MIN_PLAYER_HEIGHT_PX = 240;
+  const MIN_CHAT_HEIGHT_PX = 220;
+
+  const EXPAND_BUTTON_PATTERN = /(expand|show)\s+chat|chat\s+(expand|show)/i;
+  const COLLAPSE_BUTTON_PATTERN = /(collapse|hide)\s+chat|chat\s+(collapse|hide)/i;
+  const CHAT_BUTTON_PATTERN = /(expand|show|collapse|hide)\s+chat|chat\s+(expand|show|collapse|hide)/i;
+  const EXIT_THEATER_PATTERN = /exit (theatre|theater) mode/i;
+
+  const EXPAND_BUTTON_SELECTORS = [
+    '[data-a-target="right-column__toggle-expand-btn"]',
+    '[data-a-target="right-column__toggle-visibility-btn"]',
+    'button[aria-label="Expand Chat"]',
+    'button[aria-label="Expand chat"]',
+    'button[aria-label="Show Chat"]',
+    'button[aria-label="Show chat"]'
+  ];
+
   let scheduled = false;
   let theaterSessionActive = false;
   let theaterIntentUntil = 0;
   let suppressTheaterUntil = 0;
-
-  localStorage.removeItem("tvtc-chat-hidden");
+  let fullscreenPendingTimer = null;
 
   function clamp(min, value, max) {
     return Math.min(Math.max(value, min), max);
@@ -26,7 +50,7 @@
 
   function setChatPosition(position) {
     localStorage.setItem(POSITION_KEY, position);
-    scheduleUpdate(true);
+    scheduleUpdate();
   }
 
   function isChatHidden() {
@@ -40,8 +64,8 @@
   function setChatHidden(hidden) {
     localStorage.setItem(HIDDEN_KEY, hidden ? "true" : "false");
     if (!hidden) clickNativeChatExpand();
-    scheduleUpdate(true);
-    window.setTimeout(() => scheduleUpdate(true), 150);
+    scheduleUpdate();
+    window.setTimeout(scheduleUpdate, 150);
   }
 
   function isWatchPage() {
@@ -50,18 +74,16 @@
   }
 
   function isVerticalLayout() {
-    return window.innerHeight >= window.innerWidth || window.innerWidth <= 820;
+    return window.innerHeight >= window.innerWidth || window.innerWidth <= VERTICAL_BREAKPOINT_PX;
   }
 
   function getVideoPlayer() {
     return document.querySelector('[data-a-target="video-player"]');
   }
 
-  function hasChatContent() {
-    return Boolean(
-      document.querySelector('[data-a-target="right-column-chat-bar"]') ||
-        document.querySelector('[data-test-selector="chat-room-component-layout"]')
-    );
+  function findPlayerWrapper(videoPlayer) {
+    if (!videoPlayer) return null;
+    return videoPlayer.closest(".persistent-player") || videoPlayer.closest(".channel-root__player") || videoPlayer.parentElement;
   }
 
   function findChatNode() {
@@ -71,15 +93,22 @@
   }
 
   function findNativeChatButton(kind) {
-    const pattern = kind === "expand" ? /(expand|show)\s+chat|chat\s+(expand|show)/i : /(collapse|hide)\s+chat|chat\s+(collapse|hide)/i;
+    const pattern = kind === "expand" ? EXPAND_BUTTON_PATTERN : COLLAPSE_BUTTON_PATTERN;
     return Array.from(document.querySelectorAll("button[aria-label]")).find((button) => {
-      return !button.classList.contains("tvtc-icon-button") && pattern.test(button.getAttribute("aria-label") || "");
+      return !button.classList.contains(ICON_BUTTON_CLASS) && pattern.test(button.getAttribute("aria-label") || "");
     });
   }
 
   function isNativeChatCollapsed() {
     if (!findChatNode()) return true;
     return Boolean(findNativeChatButton("expand"));
+  }
+
+  function clickNativeChatExpand() {
+    const button = findNativeChatButton("expand") || EXPAND_BUTTON_SELECTORS
+      .map((selector) => document.querySelector(selector))
+      .find((element) => element && !element.classList.contains(ICON_BUTTON_CLASS));
+    if (button) button.click();
   }
 
   function isTheaterMode() {
@@ -89,7 +118,7 @@
 
     return (
       pressed ||
-      /exit (theatre|theater) mode/i.test(label) ||
+      EXIT_THEATER_PATTERN.test(label) ||
       Boolean(document.querySelector(".persistent-player--theatre")) ||
       Boolean(document.querySelector(".channel-root--theatre"))
     );
@@ -101,7 +130,10 @@
 
   function isActiveLayout() {
     if (isFullscreen()) return false;
-    return isWatchPage() && isVerticalLayout() && Date.now() >= suppressTheaterUntil && (isTheaterMode() || theaterSessionActive || Date.now() < theaterIntentUntil) && Boolean(getVideoPlayer());
+    if (!isWatchPage() || !isVerticalLayout()) return false;
+    if (Date.now() < suppressTheaterUntil) return false;
+    if (!isTheaterMode() && !theaterSessionActive && Date.now() >= theaterIntentUntil) return false;
+    return Boolean(getVideoPlayer());
   }
 
   function markLayoutNodes() {
@@ -120,11 +152,6 @@
     if (chat && !chat.classList.contains(CHAT_CLASS)) chat.classList.add(CHAT_CLASS);
   }
 
-  function findPlayerWrapper(videoPlayer) {
-    if (!videoPlayer) return null;
-    return videoPlayer.closest(".persistent-player") || videoPlayer.closest(".channel-root__player") || videoPlayer.parentElement;
-  }
-
   function updateLayoutVars() {
     const availableHeight = Math.max(360, window.innerHeight);
     const availableWidth = Math.max(320, window.innerWidth);
@@ -134,43 +161,23 @@
 
     if (!hidden) {
       const minChatHeight = clamp(260, availableHeight * 0.28, 460);
-      const maxPlayerHeight = Math.max(240, availableHeight - minChatHeight);
+      const maxPlayerHeight = Math.max(MIN_PLAYER_HEIGHT_PX, availableHeight - minChatHeight);
       const naturalPlayerHeight = availableWidth * 9 / 16;
-      playerHeight = Math.round(clamp(240, naturalPlayerHeight, maxPlayerHeight));
-      chatHeight = Math.round(Math.max(220, availableHeight - playerHeight));
+      playerHeight = Math.round(clamp(MIN_PLAYER_HEIGHT_PX, naturalPlayerHeight, maxPlayerHeight));
+      chatHeight = Math.round(Math.max(MIN_CHAT_HEIGHT_PX, availableHeight - playerHeight));
     }
 
     const chatPosition = getChatPosition();
-    const playerTop = hidden ? Math.round((availableHeight - playerHeight) / 2) : (chatPosition === "top" ? chatHeight : 0);
-    const style = document.documentElement.style;
+    const playerTop = hidden
+      ? Math.round((availableHeight - playerHeight) / 2)
+      : (chatPosition === "top" ? chatHeight : 0);
 
+    const style = document.documentElement.style;
     style.setProperty("--tvtc-player-top", playerTop + "px");
-    style.setProperty("--tvtc-player-height", Math.round(playerHeight) + "px");
-    style.setProperty("--tvtc-chat-height", Math.round(chatHeight) + "px");
+    style.setProperty("--tvtc-player-height", playerHeight + "px");
+    style.setProperty("--tvtc-chat-height", chatHeight + "px");
     document.documentElement.dataset.tvtcChatPosition = chatPosition;
     document.documentElement.dataset.tvtcChatHidden = hidden ? "true" : "false";
-  }
-
-  function clickNativeChatExpand() {
-    const selectors = [
-      '[data-a-target="right-column__toggle-expand-btn"]',
-      '[data-a-target="right-column__toggle-visibility-btn"]',
-      'button:not(.tvtc-icon-button)[aria-label="Expand Chat"]',
-      'button:not(.tvtc-icon-button)[aria-label="Expand chat"]',
-      'button:not(.tvtc-icon-button)[aria-label="Show Chat"]',
-      'button:not(.tvtc-icon-button)[aria-label="Show chat"]'
-    ];
-    let button = findNativeChatButton("expand");
-    if (!button) {
-      for (let i = 0; i < selectors.length; i++) {
-        const candidate = document.querySelector(selectors[i]);
-        if (candidate && !candidate.classList.contains("tvtc-icon-button")) {
-          button = candidate;
-          break;
-        }
-      }
-    }
-    if (button) button.click();
   }
 
   function iconSvg(name) {
@@ -188,7 +195,7 @@
     if (!button) {
       button = document.createElement("button");
       button.type = "button";
-      button.className = "tvtc-icon-button " + className;
+      button.className = ICON_BUTTON_CLASS + " " + className;
       container.appendChild(button);
     }
     return button;
@@ -199,7 +206,6 @@
       button.innerHTML = iconSvg(iconName);
       button.dataset.tvtcIcon = iconName;
     }
-
     button.title = label;
     button.setAttribute("aria-label", label);
     button.onclick = onClick;
@@ -237,72 +243,51 @@
     });
   }
 
-  let fullscreenPendingTimer = null;
   function setFullscreenClass(on) {
-    const had = document.documentElement.classList.contains(FS_CLASS);
-    if (had === on) return;
     document.documentElement.classList.toggle(FS_CLASS, on);
   }
+
+  function clearFullscreenPendingTimer() {
+    if (fullscreenPendingTimer) {
+      clearTimeout(fullscreenPendingTimer);
+      fullscreenPendingTimer = null;
+    }
+  }
+
   function markFullscreenPending() {
     setFullscreenClass(true);
-    if (fullscreenPendingTimer) clearTimeout(fullscreenPendingTimer);
-    fullscreenPendingTimer = window.setTimeout(function () {
+    clearFullscreenPendingTimer();
+    fullscreenPendingTimer = window.setTimeout(() => {
       fullscreenPendingTimer = null;
-      if (!isFullscreen()) {
-        setFullscreenClass(false);
-      }
-    }, 1500);
-  }
-  function deactivateLayout() {
-    document.documentElement.classList.remove(ROOT_CLASS);
-    document.querySelectorAll("." + PLAYER_CLASS).forEach((node) => node.classList.remove(PLAYER_CLASS));
-    document.querySelectorAll("." + CHAT_CLASS).forEach((node) => node.classList.remove(CHAT_CLASS));
-    const controls = document.querySelector("." + CONTROLS_CLASS);
-    if (controls) controls.remove();
-    const style = document.documentElement.style;
-    style.removeProperty("--tvtc-player-top");
-    style.removeProperty("--tvtc-player-height");
-    style.removeProperty("--tvtc-chat-height");
-    delete document.documentElement.dataset.tvtcChatPosition;
-    delete document.documentElement.dataset.tvtcChatHidden;
+      if (!isFullscreen()) setFullscreenClass(false);
+    }, FULLSCREEN_FAILSAFE_MS);
   }
 
   function update() {
     scheduled = false;
     if (isFullscreen()) return;
+
     markLayoutNodes();
+
     if (!isWatchPage() || !isVerticalLayout()) theaterSessionActive = false;
-    const theaterActive = isTheaterMode();
-    if (Date.now() >= suppressTheaterUntil) {
-      theaterSessionActive = theaterActive;
-    }
+    if (Date.now() >= suppressTheaterUntil) theaterSessionActive = isTheaterMode();
+
     const active = isActiveLayout();
     document.documentElement.classList.toggle(ROOT_CLASS, active);
 
-    if (active) {
-      updateLayoutVars();
-    }
-
+    if (active) updateLayoutVars();
     ensureControls(active);
-
-    if (document.documentElement.classList.contains(DEBUG_CLASS)) {
-      document.documentElement.dataset.tvtcState = JSON.stringify({
-        active,
-        vertical: isVerticalLayout(),
-        theater: isTheaterMode(),
-        chat: Boolean(findChatNode()),
-        hidden: isEffectiveChatHidden(),
-        position: getChatPosition(),
-        width: window.innerWidth,
-        height: window.innerHeight
-      });
-    }
   }
 
-  function scheduleUpdate(force) {
+  function scheduleUpdate() {
     if (scheduled) return;
     scheduled = true;
     window.requestAnimationFrame(update);
+  }
+
+  function scheduleUpdateBurst() {
+    scheduleUpdate();
+    POST_ACTION_REFRESH_MS.forEach((ms) => window.setTimeout(scheduleUpdate, ms));
   }
 
   function handleDocumentPointerDown(event) {
@@ -313,27 +298,23 @@
     if (theaterButton) {
       const label = theaterButton.getAttribute("aria-label") || "";
       const layoutActive = document.documentElement.classList.contains(ROOT_CLASS);
-      const isExiting = /exit (theatre|theater) mode/i.test(label) || layoutActive;
+      const isExiting = EXIT_THEATER_PATTERN.test(label) || layoutActive;
       theaterSessionActive = !isExiting;
       if (theaterSessionActive) {
-        theaterIntentUntil = Date.now() + 2500;
+        theaterIntentUntil = Date.now() + THEATER_INTENT_MS;
         suppressTheaterUntil = 0;
       } else {
         theaterIntentUntil = 0;
-        suppressTheaterUntil = Date.now() + 1200;
+        suppressTheaterUntil = Date.now() + SUPPRESS_THEATER_MS;
       }
-      scheduleUpdate(true);
-      window.setTimeout(() => scheduleUpdate(true), 0);
-      window.setTimeout(() => scheduleUpdate(true), 16);
-      window.setTimeout(() => scheduleUpdate(true), 80);
-      window.setTimeout(() => scheduleUpdate(true), 300);
+      scheduleUpdateBurst();
       return;
     }
 
     const labelledButton = target.closest("button[aria-label]");
     const label = labelledButton && labelledButton.getAttribute("aria-label");
-    if (label && /(expand|show|collapse|hide)\s+chat|chat\s+(expand|show|collapse|hide)/i.test(label)) {
-      window.setTimeout(() => scheduleUpdate(true), 120);
+    if (label && CHAT_BUTTON_PATTERN.test(label)) {
+      window.setTimeout(scheduleUpdate, 120);
     }
   }
 
@@ -341,147 +322,70 @@
     if (event.key !== "Escape") return;
     theaterSessionActive = false;
     theaterIntentUntil = 0;
-    suppressTheaterUntil = Date.now() + 1200;
-    window.setTimeout(() => scheduleUpdate(true), 0);
-    window.setTimeout(() => scheduleUpdate(true), 120);
+    suppressTheaterUntil = Date.now() + SUPPRESS_THEATER_MS;
+    window.setTimeout(scheduleUpdate, 0);
+    window.setTimeout(scheduleUpdate, 120);
   }
 
   function isIgnoredMutation(mutation) {
     const target = mutation.target instanceof Element ? mutation.target : mutation.target.parentElement;
     if (!target) return false;
-
     return Boolean(
       target.closest("." + PLAYER_CLASS) ||
-        target.closest("." + CHAT_CLASS) ||
-        target.closest("." + CONTROLS_CLASS) ||
-        target.closest('[data-a-target="video-player"]')
+      target.closest("." + CHAT_CLASS) ||
+      target.closest("." + CONTROLS_CLASS) ||
+      target.closest('[data-a-target="video-player"]')
     );
   }
 
-  function selectorSummary(element) {
-    if (!element) return null;
-    const className = typeof element.className === "string" ? element.className : "";
-    return {
-      tag: element.tagName,
-      id: element.id || "",
-      className,
-      dataTarget: element.getAttribute("data-a-target") || "",
-      ariaLabel: element.getAttribute("aria-label") || "",
-      src: element.getAttribute("src") || "",
-      pointerEvents: getComputedStyle(element).pointerEvents,
-      position: getComputedStyle(element).position
-    };
-  }
-
-  function buildDiagnostic() {
-    const player = document.querySelector("." + PLAYER_CLASS) || getVideoPlayer();
-    const rect = player && player.getBoundingClientRect();
-    const points = rect
-      ? [
-          ["topRight", rect.right - 8, rect.top + 8],
-          ["bottomRight", rect.right - 8, rect.bottom - 8],
-          ["controlsRight", rect.right - 70, rect.bottom - 35],
-          ["controlsBottomRight", rect.right - 20, rect.bottom - 35]
-        ]
-      : [];
-
-    return {
-      rootClass: document.documentElement.className,
-      rootDataset: { ...document.documentElement.dataset },
-      player: rect && { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height },
-      chat: selectorSummary(document.querySelector("." + CHAT_CLASS)),
-      hits: points.map(([name, x, y]) => {
-        const cx = Math.max(0, Math.min(window.innerWidth - 1, x));
-        const cy = Math.max(0, Math.min(window.innerHeight - 1, y));
-        return {
-          name,
-          x: cx,
-          y: cy,
-          stack: document.elementsFromPoint(cx, cy).slice(0, 12).map(selectorSummary)
-        };
-      })
-    };
-  }
-
-  function installDiagnosticBridge() {
-    document.addEventListener("tvtc:diagnose", () => {
-      document.documentElement.setAttribute("data-tvtc-diagnostic", JSON.stringify(buildDiagnostic()));
-    });
-
-    const script = document.createElement("script");
-    script.textContent = [
-      "window.tvtcDiagnose = function () {",
-      "  document.dispatchEvent(new CustomEvent('tvtc:diagnose'));",
-      "  return JSON.parse(document.documentElement.getAttribute('data-tvtc-diagnostic') || '{}');",
-      "};"
-    ].join("\n");
-    (document.head || document.documentElement).appendChild(script);
-    script.remove();
-  }
-
-  const observer = new MutationObserver((mutations) => {
-    if (isFullscreen()) return;
-    if (mutations.length && mutations.every(isIgnoredMutation)) return;
-    scheduleUpdate(false);
-  });
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true
-  });
-
-  document.addEventListener("pointerdown", handleDocumentPointerDown, true);
-  document.addEventListener("keydown", handleDocumentKeyDown, true);
-  document.addEventListener("tvtc:fs-request", function () {
-    markFullscreenPending();
-  });
-  document.addEventListener("tvtc:fs-request-failed", function () {
-    if (fullscreenPendingTimer) {
-      clearTimeout(fullscreenPendingTimer);
-      fullscreenPendingTimer = null;
-    }
-    if (!isFullscreen()) {
-      setFullscreenClass(false);
-    }
-  });
   function handleFullscreenChange() {
-    if (fullscreenPendingTimer) {
-      clearTimeout(fullscreenPendingTimer);
-      fullscreenPendingTimer = null;
-    }
+    clearFullscreenPendingTimer();
     if (isFullscreen()) {
       setFullscreenClass(true);
       return;
     }
     setFullscreenClass(false);
     suppressTheaterUntil = 0;
-    scheduleUpdate(true);
-    window.setTimeout(() => scheduleUpdate(true), 80);
+    scheduleUpdate();
+    window.setTimeout(scheduleUpdate, 80);
   }
+
+  const observer = new MutationObserver((mutations) => {
+    if (isFullscreen()) return;
+    if (mutations.length && mutations.every(isIgnoredMutation)) return;
+    scheduleUpdate();
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+
+  document.addEventListener("pointerdown", handleDocumentPointerDown, true);
+  document.addEventListener("keydown", handleDocumentKeyDown, true);
+  document.addEventListener("tvtc:fs-request", markFullscreenPending);
+  document.addEventListener("tvtc:fs-request-failed", () => {
+    clearFullscreenPendingTimer();
+    if (!isFullscreen()) setFullscreenClass(false);
+  });
   document.addEventListener("fullscreenchange", handleFullscreenChange);
   document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
-  window.addEventListener("resize", () => scheduleUpdate(true), { passive: true });
-  window.addEventListener("orientationchange", () => scheduleUpdate(true), { passive: true });
-  window.addEventListener("popstate", () => scheduleUpdate(true));
+  window.addEventListener("resize", scheduleUpdate, { passive: true });
+  window.addEventListener("orientationchange", scheduleUpdate, { passive: true });
+  window.addEventListener("popstate", scheduleUpdate);
   window.setInterval(() => {
     if (isFullscreen()) return;
-    if (!document.documentElement.classList.contains(ROOT_CLASS)) scheduleUpdate(false);
-  }, 1000);
+    if (!document.documentElement.classList.contains(ROOT_CLASS)) scheduleUpdate();
+  }, IDLE_REFRESH_INTERVAL_MS);
 
-  const pushState = history.pushState;
-  const replaceState = history.replaceState;
-
+  const originalPushState = history.pushState;
+  const originalReplaceState = history.replaceState;
   history.pushState = function () {
-    const result = pushState.apply(this, arguments);
-    scheduleUpdate(true);
+    const result = originalPushState.apply(this, arguments);
+    scheduleUpdate();
     return result;
   };
-
   history.replaceState = function () {
-    const result = replaceState.apply(this, arguments);
-    scheduleUpdate(true);
+    const result = originalReplaceState.apply(this, arguments);
+    scheduleUpdate();
     return result;
   };
 
-  installDiagnosticBridge();
-  scheduleUpdate(true);
+  scheduleUpdate();
 })();

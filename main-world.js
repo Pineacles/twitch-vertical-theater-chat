@@ -3,41 +3,29 @@
   window.__tvtcFsHookInstalled = true;
 
   function fire(name) {
-    try {
-      document.dispatchEvent(new CustomEvent(name));
-    } catch (e) {}
+    document.dispatchEvent(new CustomEvent(name));
   }
 
-  const proto = Element.prototype;
+  function wrap(proto, methodName, isPromiseBased) {
+    const original = proto[methodName];
+    if (typeof original !== "function") return;
 
-  if (typeof proto.requestFullscreen === "function") {
-    const orig = proto.requestFullscreen;
-    proto.requestFullscreen = function () {
+    proto[methodName] = function () {
       fire("tvtc:fs-request");
       let result;
       try {
-        result = orig.apply(this, arguments);
-      } catch (e) {
+        result = original.apply(this, arguments);
+      } catch (error) {
         fire("tvtc:fs-request-failed");
-        throw e;
+        throw error;
       }
-      if (result && typeof result.then === "function") {
-        result.then(undefined, function () { fire("tvtc:fs-request-failed"); });
+      if (isPromiseBased && result && typeof result.then === "function") {
+        result.then(undefined, () => fire("tvtc:fs-request-failed"));
       }
       return result;
     };
   }
 
-  if (typeof proto.webkitRequestFullscreen === "function") {
-    const origWebkit = proto.webkitRequestFullscreen;
-    proto.webkitRequestFullscreen = function () {
-      fire("tvtc:fs-request");
-      try {
-        return origWebkit.apply(this, arguments);
-      } catch (e) {
-        fire("tvtc:fs-request-failed");
-        throw e;
-      }
-    };
-  }
+  wrap(Element.prototype, "requestFullscreen", true);
+  wrap(Element.prototype, "webkitRequestFullscreen", false);
 })();
