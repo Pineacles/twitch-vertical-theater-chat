@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Twitch Vertical Theater Chat",
   "description": "Vertical Theater Mode for Twitch: video on top, chat below or above, in tall or narrow windows. Automatic and lightweight.",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "minimum_chrome_version": "112",
   "homepage_url": "https://github.com/Pineacles/twitch-vertical-theater-chat",
   "icons": {

@@ -459,6 +459,11 @@
     const target = event.target instanceof Element ? event.target : null;
     if (target && target.closest('input, textarea, [contenteditable="true"], [role="textbox"]')) return;
 
+    // Same when a Twitch modal (settings menu, clip dialog) is open: Escape
+    // closes the modal, not Theater Mode. If Twitch does exit theater anyway,
+    // the MutationObserver sees the class change and tears down normally.
+    if (document.body.classList.contains("ReactModal__Body--open")) return;
+
     theaterSessionActive = false;
     theaterIntentUntil = 0;
     suppressTheaterUntil = Date.now() + SUPPRESS_THEATER_MS;

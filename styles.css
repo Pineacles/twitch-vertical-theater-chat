@@ -76,7 +76,7 @@
     min-height: 0 !important;
     max-width: none !important;
     max-height: var(--tvtc-player-height) !important;
-    z-index: 2147480010 !important;
+    z-index: 3000 !important; /* below Twitch's dialog layer (.tw-dialog-layer, z 5000) so settings/clip modals stay visible */
     transform: none !important;
     background: #000 !important;
     overflow: visible !important;
@@ -98,7 +98,7 @@
     border-left: 0 !important;
     border-top: 1px solid rgba(255, 255, 255, 0.14) !important;
     transform: none !important;
-    z-index: 2147480020 !important;
+    z-index: 3010 !important;
     overflow: hidden !important;
     contain: layout paint !important;
   }
@@ -123,7 +123,7 @@
     position: fixed !important;
     left: 10px !important;
     right: auto !important;
-    z-index: 2147483647 !important;
+    z-index: 3030 !important;
     display: flex !important;
     gap: 6px !important;
     align-items: center !important;

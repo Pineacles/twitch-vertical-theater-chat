@@ -94,6 +94,10 @@ Works in Chrome, Brave, Edge, Vivaldi, Opera, Arc (Chromium 112+):
 Firefox is not supported (MAIN-world content scripts and the layout CSS rely
 on Chromium behavior).
 
+Verified compatible with **FrankerFaceZ** — FFZ's chat enhancements and player
+buttons work normally inside the vertical layout. Twitch's own dialogs
+(player settings, clip creation) open above the layout as usual.
+
 ## Settings
 
 <img src="docs/screenshots/popup.png" alt="Toolbar popup with enable switch, chat position, visibility, and threshold" width="300" align="right">
