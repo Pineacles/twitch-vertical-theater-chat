@@ -14,7 +14,7 @@ This extension detects that situation and rebuilds the layout the way a phone
 app would: the player spans the full width at its natural 16:9 size, and chat
 gets all the leftover vertical space.
 
-It activates by itself and gets out of the way by itself — no clicking a mode
+It activates by itself and gets out of the way by itself, no clicking a mode
 button, no broken fullscreen, no leftover styles when you widen the window.
 
 <p align="center">
@@ -25,7 +25,7 @@ button, no broken fullscreen, no leftover styles when you widen the window.
 
 ## Features
 
-- **Automatic**: activates only when all three are true — you're on a Twitch
+- **Automatic**: activates only when all three are true you're on a Twitch
   watch page, Theater Mode is on, and the window is portrait or narrower than
   the threshold (820 px by default). Widen the window or leave Theater Mode
   and Twitch's native layout returns untouched.
@@ -42,7 +42,7 @@ button, no broken fullscreen, no leftover styles when you widen the window.
 - **Native-chat aware**: if you collapsed chat with Twitch's own button, the
   vertical layout mirrors that instead of fighting it.
 - **Synced settings**: on/off, chat position, chat visibility, and the width
-  threshold live in `chrome.storage.sync` — they survive clearing site data
+  threshold live in `chrome.storage.sync` they survive clearing site data
   and follow your browser profile.
 - **Private by design**: no analytics, no network requests, no host access
   beyond `twitch.tv`. See [PRIVACY.md](PRIVACY.md).
@@ -76,7 +76,7 @@ Design choices worth stealing:
 
 ### Chrome Web Store
 
-Not yet published — the repo is store-ready (`scripts/package.sh` builds the
+Not yet published, the repo is store-ready (`scripts/package.sh` builds the
 upload zip, `docs/STORE_LISTING.md` has the complete listing copy). The link
 will land here once it clears review.
 
@@ -116,7 +116,7 @@ synced settings.
 
 ## Development
 
-There is intentionally no build step — the files you read are the files that
+There is intentionally no build step the files you read are the files that
 run. To hack on it:
 
 ```bash
