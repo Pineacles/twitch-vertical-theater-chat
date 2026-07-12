@@ -84,7 +84,16 @@
     box-sizing: border-box !important;
   }
 
+  /* The chat's native-place wrapper columns are empty once the chat is
+     repositioned, but still hit-test over the player (sibling stacking
+     context — see content.js markChatAncestors). Make them mouse-transparent;
+     the chat itself re-enables. */
+  & .tvtc-chat-anc {
+    pointer-events: none !important;
+  }
+
   & .tvtc-chat {
+    pointer-events: auto !important;
     position: fixed !important;
     right: 0 !important;
     left: 0 !important;

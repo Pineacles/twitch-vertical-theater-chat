@@ -2,6 +2,7 @@
   const ROOT_CLASS = "tvtc-vertical-theater";
   const PLAYER_CLASS = "tvtc-player";
   const CHAT_CLASS = "tvtc-chat";
+  const CHAT_ANCESTOR_CLASS = "tvtc-chat-anc";
   const FS_CLASS = "tvtc-fs";
   const CONTROLS_CLASS = "tvtc-controls";
   const ICON_BUTTON_CLASS = "tvtc-icon-button";
@@ -250,6 +251,29 @@
 
     if (player && !player.classList.contains(PLAYER_CLASS)) player.classList.add(PLAYER_CLASS);
     if (chat && !chat.classList.contains(CHAT_CLASS)) chat.classList.add(CHAT_CLASS);
+
+    markChatAncestors(chat, player);
+  }
+
+  // At desktop widths Twitch nests the theater chat in wrapper columns that
+  // natively overlay the right edge of the full-window player. Once the chat
+  // is repositioned, those wrappers are empty but still intercept the mouse
+  // (they can sit in a sibling stacking context, so no z-index of ours can
+  // beat them). Mark them so the CSS can disable their pointer events; stop
+  // before any ancestor that also contains the player.
+  function markChatAncestors(chat, player) {
+    const marked = new Set();
+    if (chat) {
+      let node = chat.parentElement;
+      while (node && node !== document.body && !(player && node.contains(player))) {
+        node.classList.add(CHAT_ANCESTOR_CLASS);
+        marked.add(node);
+        node = node.parentElement;
+      }
+    }
+    document.querySelectorAll("." + CHAT_ANCESTOR_CLASS).forEach((node) => {
+      if (!marked.has(node)) node.classList.remove(CHAT_ANCESTOR_CLASS);
+    });
   }
 
   function updateLayoutVars(effectiveHidden) {
