@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Twitch Vertical Theater Chat</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="header">
+    <img src="../icons/icon-32.png" alt="" width="20" height="20">
+    <h1>Vertical Theater Chat</h1>
+    <span class="version" id="version"></span>
+  </header>
+
+  <main>
+    <label class="row switch-row master">
+      <span class="row-label">Enabled</span>
+      <span class="switch">
+        <input type="checkbox" id="enabled">
+        <span class="slider"></span>
+      </span>
+    </label>
+
+    <div class="row">
+      <span class="row-label">Chat position</span>
+      <div class="segmented" role="radiogroup" aria-label="Chat position">
+        <button type="button" id="pos-bottom" data-value="bottom">Below</button>
+        <button type="button" id="pos-top" data-value="top">Above</button>
+      </div>
+    </div>
+
+    <label class="row switch-row">
+      <span class="row-label">Show chat</span>
+      <span class="switch">
+        <input type="checkbox" id="chat-visible">
+        <span class="slider"></span>
+      </span>
+    </label>
+
+    <label class="row">
+      <span class="row-label">Narrow-window threshold
+        <span class="hint">Also activates in windows at or under this width</span>
+      </span>
+      <span class="number-wrap">
+        <input type="number" id="breakpoint" min="480" max="1600" step="10"> px
+      </span>
+    </label>
+  </main>
+
+  <p class="status">
+    Active on Twitch watch pages while <strong>Theater Mode</strong> is on and
+    the window is taller than it is wide, or narrower than the threshold.
+  </p>
+
+  <footer>
+    <a href="https://github.com/Pineacles/twitch-vertical-theater-chat" target="_blank" rel="noreferrer">GitHub</a>
+    <span aria-hidden="true">·</span>
+    <a href="https://github.com/Pineacles/twitch-vertical-theater-chat/issues" target="_blank" rel="noreferrer">Report an issue</a>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>

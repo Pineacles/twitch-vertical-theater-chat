@@ -28,4 +28,21 @@
 
   wrap(Element.prototype, "requestFullscreen", true);
   wrap(Element.prototype, "webkitRequestFullscreen", false);
+
+  // Twitch is an SPA — page-initiated history changes only happen in this
+  // world, so the navigation signal must be hooked here and relayed to the
+  // content script as a DOM event (same pattern as the fullscreen hooks).
+  function wrapHistory(methodName) {
+    const original = history[methodName];
+    if (typeof original !== "function") return;
+
+    history[methodName] = function () {
+      const result = original.apply(this, arguments);
+      fire("tvtc:nav");
+      return result;
+    };
+  }
+
+  wrapHistory("pushState");
+  wrapHistory("replaceState");
 })();

@@ -8,17 +8,32 @@
   const POSITION_BUTTON_CLASS = "tvtc-position-action";
   const VISIBILITY_BUTTON_CLASS = "tvtc-visibility-action";
 
-  const POSITION_KEY = "tvtc-chat-position";
-  const HIDDEN_KEY = "tvtc-chat-hidden-v2";
+  const LEGACY_POSITION_KEY = "tvtc-chat-position";
+  const LEGACY_HIDDEN_KEY = "tvtc-chat-hidden-v2";
 
-  const VERTICAL_BREAKPOINT_PX = 820;
   const THEATER_INTENT_MS = 2500;
   const SUPPRESS_THEATER_MS = 1200;
+  const ESCAPE_VERIFY_MS = 150;
   const FULLSCREEN_FAILSAFE_MS = 1500;
   const POST_ACTION_REFRESH_MS = [0, 16, 80, 300];
   const IDLE_REFRESH_INTERVAL_MS = 1000;
   const MIN_PLAYER_HEIGHT_PX = 240;
   const MIN_CHAT_HEIGHT_PX = 220;
+
+  const DEFAULT_SETTINGS = {
+    enabled: true,
+    chatPosition: "bottom",
+    chatHidden: false,
+    breakpointPx: 820
+  };
+
+  // Paths that can never be a watch page. Everything else is still gated on
+  // Theater Mode being active and a video player existing in the DOM.
+  const NON_WATCH_PREFIXES = [
+    "/directory", "/videos", "/settings", "/search", "/subscriptions",
+    "/inventory", "/drops", "/wallet", "/friends", "/messages", "/popout",
+    "/moderator", "/downloads", "/jobs", "/store", "/turbo", "/p/", "/u/"
+  ];
 
   const EXPAND_BUTTON_PATTERN = /(expand|show)\s+chat|chat\s+(expand|show)/i;
   const COLLAPSE_BUTTON_PATTERN = /(collapse|hide)\s+chat|chat\s+(collapse|hide)/i;
@@ -34,6 +49,7 @@
     'button[aria-label="Show chat"]'
   ];
 
+  let settings = Object.assign({}, DEFAULT_SETTINGS);
   let scheduled = false;
   let theaterSessionActive = false;
   let theaterIntentUntil = 0;
@@ -44,37 +60,116 @@
     return Math.min(Math.max(value, min), max);
   }
 
+  // ------------------------------------------------------------------
+  // Settings (chrome.storage.sync, shared with the toolbar popup)
+  // ------------------------------------------------------------------
+
+  function applySettings(partial) {
+    for (const key of Object.keys(DEFAULT_SETTINGS)) {
+      if (!(key in partial)) continue;
+      if (key === "breakpointPx") {
+        const value = Number(partial[key]);
+        settings[key] = Number.isFinite(value)
+          ? clamp(480, value, 1600)
+          : DEFAULT_SETTINGS.breakpointPx;
+      } else {
+        settings[key] = partial[key];
+      }
+    }
+  }
+
+  function saveSettings(partial) {
+    applySettings(partial);
+    try {
+      chrome.storage.sync.set(partial);
+    } catch (error) {
+      // Extension context can be invalidated on update/reload; the local
+      // copy still drives this page session.
+    }
+  }
+
+  function loadSettings() {
+    let stored;
+    try {
+      stored = chrome.storage.sync.get(null);
+    } catch (error) {
+      scheduleUpdate();
+      return;
+    }
+    stored.then((raw) => {
+      // One-time migration from the pre-1.2 localStorage keys.
+      const migrated = {};
+      const legacyPosition = localStorage.getItem(LEGACY_POSITION_KEY);
+      const legacyHidden = localStorage.getItem(LEGACY_HIDDEN_KEY);
+      if (!("chatPosition" in raw) && (legacyPosition === "top" || legacyPosition === "bottom")) {
+        migrated.chatPosition = legacyPosition;
+      }
+      if (!("chatHidden" in raw) && legacyHidden !== null) {
+        migrated.chatHidden = legacyHidden === "true";
+      }
+      applySettings(raw);
+      if (Object.keys(migrated).length) {
+        saveSettings(migrated);
+        localStorage.removeItem(LEGACY_POSITION_KEY);
+        localStorage.removeItem(LEGACY_HIDDEN_KEY);
+      }
+      scheduleUpdateBurst();
+    }).catch(() => scheduleUpdate());
+  }
+
+  function watchSettings() {
+    try {
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== "sync") return;
+        const partial = {};
+        for (const key of Object.keys(changes)) {
+          if (key in DEFAULT_SETTINGS) partial[key] = changes[key].newValue;
+        }
+        if (!Object.keys(partial).length) return;
+        // onChanged also fires for our own writes; the local copy is already
+        // up to date then, and side effects (chat expand) must not re-run.
+        const selfEcho = "chatHidden" in partial && settings.chatHidden === partial.chatHidden;
+        applySettings(partial);
+        if (!selfEcho && partial.chatHidden === false) clickNativeChatExpand();
+        scheduleUpdateBurst();
+      });
+    } catch (error) {
+      // No storage access — popup settings just won't live-sync.
+    }
+  }
+
   function getChatPosition() {
-    return localStorage.getItem(POSITION_KEY) === "top" ? "top" : "bottom";
+    return settings.chatPosition === "top" ? "top" : "bottom";
   }
 
   function setChatPosition(position) {
-    localStorage.setItem(POSITION_KEY, position);
+    saveSettings({ chatPosition: position });
     scheduleUpdate();
   }
 
   function isChatHidden() {
-    return localStorage.getItem(HIDDEN_KEY) === "true";
-  }
-
-  function isEffectiveChatHidden() {
-    return isChatHidden() || isNativeChatCollapsed();
+    return settings.chatHidden === true;
   }
 
   function setChatHidden(hidden) {
-    localStorage.setItem(HIDDEN_KEY, hidden ? "true" : "false");
+    saveSettings({ chatHidden: hidden });
     if (!hidden) clickNativeChatExpand();
     scheduleUpdate();
     window.setTimeout(scheduleUpdate, 150);
   }
 
+  // ------------------------------------------------------------------
+  // Page-state queries
+  // ------------------------------------------------------------------
+
   function isWatchPage() {
     const path = window.location.pathname;
-    return path.length > 1 && !path.startsWith("/directory") && !path.startsWith("/videos");
+    if (path.length <= 1) return false;
+    return !NON_WATCH_PREFIXES.some((prefix) => path.startsWith(prefix));
   }
 
   function isVerticalLayout() {
-    return window.innerHeight >= window.innerWidth || window.innerWidth <= VERTICAL_BREAKPOINT_PX;
+    return window.innerHeight >= window.innerWidth || window.innerWidth <= settings.breakpointPx;
   }
 
   function getVideoPlayer() {
@@ -129,12 +224,17 @@
   }
 
   function isActiveLayout() {
+    if (!settings.enabled) return false;
     if (isFullscreen()) return false;
     if (!isWatchPage() || !isVerticalLayout()) return false;
     if (Date.now() < suppressTheaterUntil) return false;
     if (!isTheaterMode() && !theaterSessionActive && Date.now() >= theaterIntentUntil) return false;
     return Boolean(getVideoPlayer());
   }
+
+  // ------------------------------------------------------------------
+  // Layout
+  // ------------------------------------------------------------------
 
   function markLayoutNodes() {
     const videoPlayer = getVideoPlayer();
@@ -152,14 +252,13 @@
     if (chat && !chat.classList.contains(CHAT_CLASS)) chat.classList.add(CHAT_CLASS);
   }
 
-  function updateLayoutVars() {
+  function updateLayoutVars(effectiveHidden) {
     const availableHeight = Math.max(360, window.innerHeight);
     const availableWidth = Math.max(320, window.innerWidth);
-    const hidden = isEffectiveChatHidden();
     let playerHeight = availableHeight;
     let chatHeight = 0;
 
-    if (!hidden) {
+    if (!effectiveHidden) {
       const minChatHeight = clamp(260, availableHeight * 0.28, 460);
       const maxPlayerHeight = Math.max(MIN_PLAYER_HEIGHT_PX, availableHeight - minChatHeight);
       const naturalPlayerHeight = availableWidth * 9 / 16;
@@ -168,7 +267,7 @@
     }
 
     const chatPosition = getChatPosition();
-    const playerTop = hidden
+    const playerTop = effectiveHidden
       ? Math.round((availableHeight - playerHeight) / 2)
       : (chatPosition === "top" ? chatHeight : 0);
 
@@ -177,8 +276,12 @@
     style.setProperty("--tvtc-player-height", playerHeight + "px");
     style.setProperty("--tvtc-chat-height", chatHeight + "px");
     document.documentElement.dataset.tvtcChatPosition = chatPosition;
-    document.documentElement.dataset.tvtcChatHidden = hidden ? "true" : "false";
+    document.documentElement.dataset.tvtcChatHidden = effectiveHidden ? "true" : "false";
   }
+
+  // ------------------------------------------------------------------
+  // Floating controls
+  // ------------------------------------------------------------------
 
   function iconSvg(name) {
     const icons = {
@@ -211,7 +314,7 @@
     button.onclick = onClick;
   }
 
-  function ensureControls(active) {
+  function ensureControls(active, effectiveHidden) {
     let controls = document.querySelector("." + CONTROLS_CLASS);
 
     if (!active) {
@@ -228,7 +331,6 @@
     const positionButton = ensureButton(controls, POSITION_BUTTON_CLASS);
     const visibilityButton = ensureButton(controls, VISIBILITY_BUTTON_CLASS);
     const nextPosition = getChatPosition() === "top" ? "bottom" : "top";
-    const hidden = isEffectiveChatHidden();
 
     updateButton(positionButton, nextPosition === "top" ? "up" : "down", "Move chat to " + nextPosition, (event) => {
       event.preventDefault();
@@ -236,12 +338,16 @@
       setChatPosition(nextPosition);
     });
 
-    updateButton(visibilityButton, hidden ? "show" : "hide", hidden ? "Show chat" : "Hide chat", (event) => {
+    updateButton(visibilityButton, effectiveHidden ? "show" : "hide", effectiveHidden ? "Show chat" : "Hide chat", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      setChatHidden(!hidden);
+      setChatHidden(!effectiveHidden);
     });
   }
+
+  // ------------------------------------------------------------------
+  // Fullscreen handling
+  // ------------------------------------------------------------------
 
   function setFullscreenClass(on) {
     document.documentElement.classList.toggle(FS_CLASS, on);
@@ -263,6 +369,22 @@
     }, FULLSCREEN_FAILSAFE_MS);
   }
 
+  function handleFullscreenChange() {
+    clearFullscreenPendingTimer();
+    if (isFullscreen()) {
+      setFullscreenClass(true);
+      return;
+    }
+    setFullscreenClass(false);
+    suppressTheaterUntil = 0;
+    scheduleUpdate();
+    window.setTimeout(scheduleUpdate, 80);
+  }
+
+  // ------------------------------------------------------------------
+  // Update loop
+  // ------------------------------------------------------------------
+
   function update() {
     scheduled = false;
     if (isFullscreen()) return;
@@ -275,8 +397,15 @@
     const active = isActiveLayout();
     document.documentElement.classList.toggle(ROOT_CLASS, active);
 
-    if (active) updateLayoutVars();
-    ensureControls(active);
+    if (active) {
+      // Native chat state is a full-document button scan — compute it once
+      // per pass and share it between layout vars and controls.
+      const effectiveHidden = isChatHidden() || isNativeChatCollapsed();
+      updateLayoutVars(effectiveHidden);
+      ensureControls(true, effectiveHidden);
+    } else {
+      ensureControls(false, false);
+    }
   }
 
   function scheduleUpdate() {
@@ -289,6 +418,10 @@
     scheduleUpdate();
     POST_ACTION_REFRESH_MS.forEach((ms) => window.setTimeout(scheduleUpdate, ms));
   }
+
+  // ------------------------------------------------------------------
+  // Event handlers
+  // ------------------------------------------------------------------
 
   function handleDocumentPointerDown(event) {
     const target = event.target instanceof Element ? event.target : null;
@@ -320,11 +453,27 @@
 
   function handleDocumentKeyDown(event) {
     if (event.key !== "Escape") return;
+
+    // Escape inside chat input / search / any editable field never exits
+    // Theater Mode — don't tear the layout down for it.
+    const target = event.target instanceof Element ? event.target : null;
+    if (target && target.closest('input, textarea, [contenteditable="true"], [role="textbox"]')) return;
+
     theaterSessionActive = false;
     theaterIntentUntil = 0;
     suppressTheaterUntil = Date.now() + SUPPRESS_THEATER_MS;
     window.setTimeout(scheduleUpdate, 0);
-    window.setTimeout(scheduleUpdate, 120);
+
+    // Escape also closes Twitch overlays (emote picker, menus) without
+    // leaving Theater Mode. Verify shortly after: if Theater Mode is still
+    // on, cancel the suppression instead of flapping the layout for 1.2s.
+    window.setTimeout(() => {
+      if (isTheaterMode()) {
+        suppressTheaterUntil = 0;
+        theaterSessionActive = true;
+      }
+      scheduleUpdate();
+    }, ESCAPE_VERIFY_MS);
   }
 
   function isIgnoredMutation(mutation) {
@@ -338,20 +487,12 @@
     );
   }
 
-  function handleFullscreenChange() {
-    clearFullscreenPendingTimer();
-    if (isFullscreen()) {
-      setFullscreenClass(true);
-      return;
-    }
-    setFullscreenClass(false);
-    suppressTheaterUntil = 0;
-    scheduleUpdate();
-    window.setTimeout(scheduleUpdate, 80);
-  }
+  // ------------------------------------------------------------------
+  // Wiring
+  // ------------------------------------------------------------------
 
   const observer = new MutationObserver((mutations) => {
-    if (isFullscreen()) return;
+    if (document.hidden || isFullscreen()) return;
     if (mutations.length && mutations.every(isIgnoredMutation)) return;
     scheduleUpdate();
   });
@@ -366,26 +507,25 @@
   });
   document.addEventListener("fullscreenchange", handleFullscreenChange);
   document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+  // SPA navigations, signalled by the main-world history hook.
+  document.addEventListener("tvtc:nav", scheduleUpdateBurst);
+  window.addEventListener("popstate", scheduleUpdate);
   window.addEventListener("resize", scheduleUpdate, { passive: true });
   window.addEventListener("orientationchange", scheduleUpdate, { passive: true });
-  window.addEventListener("popstate", scheduleUpdate);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) scheduleUpdate();
+  });
+
+  // Failsafe sweep for anything the observer misses. Skipped entirely while
+  // the tab is hidden or the window is horizontal — the observer and the
+  // resize/visibility listeners re-arm it when circumstances change.
   window.setInterval(() => {
-    if (isFullscreen()) return;
+    if (document.hidden || isFullscreen()) return;
+    if (!settings.enabled || !isVerticalLayout()) return;
     if (!document.documentElement.classList.contains(ROOT_CLASS)) scheduleUpdate();
   }, IDLE_REFRESH_INTERVAL_MS);
 
-  const originalPushState = history.pushState;
-  const originalReplaceState = history.replaceState;
-  history.pushState = function () {
-    const result = originalPushState.apply(this, arguments);
-    scheduleUpdate();
-    return result;
-  };
-  history.replaceState = function () {
-    const result = originalReplaceState.apply(this, arguments);
-    scheduleUpdate();
-    return result;
-  };
-
+  loadSettings();
+  watchSettings();
   scheduleUpdate();
 })();
